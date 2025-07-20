@@ -11,89 +11,258 @@ import QRCode from "react-qr-code";
 
 export default function BookingConfirmationPage({ params }: { params: { id: string } }) {
   const [showQR, setShowQR] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const searchParams = useSearchParams()
   const router = useRouter()
   const [bookingData, setBookingData] = useState<any>(null)
   const [paymentCompleted, setPaymentCompleted] = useState(false)
   const [bookingNumber, setBookingNumber] = useState("")
 
-  // Mock data dựa trên API response mà user cung cấp
+  // Ensure component is mounted to prevent hydration issues
   useEffect(() => {
-    // Kiểm tra mã giảm giá từ URL params hoặc localStorage
-    const appliedPromoCode = searchParams.get('promo') || localStorage.getItem('appliedPromoCode');
+    setMounted(true);
+  }, []);
+
+  // Fetch data thật từ API dựa trên URL params
+  useEffect(() => {
+    if (!mounted) return; // Only run after component is mounted
     
-    // Xử lý tính toán giá theo mã giảm giá
-    let mockData;
+    // Lấy orderId từ URL parameters
+    const orderId = searchParams.get('orderId');
     
-    if (appliedPromoCode === 'JULY2507') {
-      // Mã JULY2507: Giảm cố định 500.000đ
-      mockData = {
-        "id": "387984fb-af7d-4a86-8b5b-469d2dddd262",
-        "status": "confirmed",
-        "original_price": "3500000.00",
-        "discount_amount": "500000.00",
-        "total_price": "3000000.00", // 3.500.000 - 500.000
-        "promo_code": "JULY2507",
-        "booking_date": "2025-07-19T09:11:52.000Z",
-      };
-    } else if (appliedPromoCode === 'SUMMER2025') {
-      // Mã SUMMER2025: Giảm 10%
-      mockData = {
-        "id": "387984fb-af7d-4a86-8b5b-469d2dddd262", 
-        "status": "confirmed",
-        "original_price": "3500000.00",
-        "discount_amount": "350000.00", // 10% của 3.500.000
-        "total_price": "3150000.00", // 3.500.000 - 350.000
-        "promo_code": "SUMMER2025",
-        "booking_date": "2025-07-19T09:11:52.000Z",
-      };
-    } else {
-      // Không có mã giảm giá
-      mockData = {
-        "id": "387984fb-af7d-4a86-8b5b-469d2dddd262",
-        "status": "confirmed", 
-        "original_price": "3500000.00",
-        "discount_amount": "0.00",
-        "total_price": "3500000.00",
-        "booking_date": "2025-07-19T09:11:52.000Z",
-      };
-    }
-    
-    // Thêm thông tin tour, user, payment cho tất cả các trường hợp
-    const commonData = {
-      "tour": {
-        "name": "Tour du lịch Đà Lạt 4N3Đ - Trải nghiệm ngàn hoa",
-        "location": "Đà Lạt", 
-        "departure_location": "Hồ Chí Minh",
-        "images": [{"image_url": "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg", "is_main": true}]
-      },
-      "user": {
-        "name": "Guest User",
-        "email": "guest@tour.com"
-      },
-      "payment": {
-        "payment_method": "VNPay",
-        "status": "completed",
-        "amount": mockData.total_price
-      },
-      "guests": [
-        {
-          "name": "NguyenVan A",
-          "email": "nhom2@gmail.com", 
-          "phone": "0123456789",
-          "cccd": "089303002985"
+    if (!orderId) {
+      console.warn('No orderId found in URL parameters, using fallback mock data');
+      
+      // Fallback với mock data khi không có orderId
+      const amount = searchParams.get('amount') || '9360000';
+      const mockBookingData = {
+        id: "mock-booking-id-001",
+        status: "confirmed",
+        original_price: "10400000.00",
+        discount_amount: "1040000.00",
+        total_price: amount,
+        promotion_id: "promo-summer-2025",
+        booking_date: new Date().toISOString(),
+        number_of_adults: 2,
+        number_of_children: 0,
+        tour: {
+          name: "Tour khám phá Đà Nẵng - Hội An 4N3Đ",
+          location: "Đà Nẵng",
+          departure_location: "Hồ Chí Minh",
+          images: [{
+            image_url: "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg",
+            is_main: true
+          }]
+        },
+        user: {
+          name: "Guest User",
+          email: "guest@tour.com"
+        },
+        payment: {
+          payment_method: "MoMo",
+          status: "completed",
+          amount: amount,
+          order_id: "MOCK_ORDER_" + Date.now()
+        },
+        guests: [{
+          name: "Nguyen Van A",
+          email: "guest@tour.com",
+          phone: "0123456789",
+          cccd: "089303002985"
+        }],
+        departureDate: {
+          departure_date: "2025-09-05",
+          end_date: "2025-09-08"
         }
-      ],
-      "departureDate": {
-        "departure_date": "2025-09-05",
-        "end_date": "2025-09-06" 
+      };
+      
+      setBookingData(mockBookingData);
+      setBookingNumber("mock-booking-id-001");
+      setPaymentCompleted(true);
+      return;
+    }
+
+    // Fetch payment data từ API endpoint - thử nhiều endpoint
+    const tryFetchPaymentData = async () => {
+      try {
+        // Thử endpoint by-order trước
+        const response = await fetch(`http://localhost:5000/api/payments/by-order/${orderId}`);
+        console.log('API Response status:', response.status);
+        
+        if (response.ok) {
+          const apiData = await response.json();
+          console.log('Payment API response:', apiData);
+          return apiData;
+        } else {
+          console.log('by-order endpoint failed, trying alternative...');
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      } catch (error) {
+        console.log('Trying general payments endpoint...');
+        
+        // Fallback: thử lấy tất cả payments và filter
+        try {
+          const allPaymentsResponse = await fetch(`http://localhost:5000/api/payments`);
+          if (allPaymentsResponse.ok) {
+            const allPaymentsData = await allPaymentsResponse.json();
+            console.log('All payments data:', allPaymentsData);
+            
+            // Tìm payment với orderId
+            const payments = allPaymentsData.data || allPaymentsData || [];
+            const targetPayment = payments.find((p: any) => p.order_id === orderId);
+            
+            if (targetPayment) {
+              console.log('Found payment by filtering:', targetPayment);
+              // Handle wrapped format nếu cần
+              return targetPayment.data || targetPayment;
+            }
+          }
+        } catch (fallbackError) {
+          console.log('All fallback attempts failed:', fallbackError);
+        }
+        
+        throw error;
       }
     };
 
-    setBookingData({...mockData, ...commonData});
-    setBookingNumber("387984fb-af7d-4a86-8b5b-469d2dddd262");
-    setPaymentCompleted(true);
-  }, []);
+    tryFetchPaymentData()
+      .then(apiData => {
+        console.log('Payment API response:', apiData);
+        console.log('API data type:', typeof apiData);
+        console.log('API data keys:', Object.keys(apiData || {}));
+        
+        if (!apiData) {
+          console.error('API returned null or undefined');
+          return;
+        }
+        
+        // Handle wrapped response format {success: true, data: {...}}
+        let paymentData = apiData;
+        if (apiData.success && apiData.data) {
+          console.log('Using wrapped data format');
+          paymentData = apiData.data;
+        }
+        
+        console.log('Has booking?', !!paymentData?.booking);
+        
+        if (!paymentData.booking) {
+          console.error('No booking data in payment response. Available keys:', Object.keys(paymentData));
+          console.log('Full payment data:', JSON.stringify(paymentData, null, 2));
+          return;
+        }
+
+        // Sử dụng data từ API response với cấu trúc mới
+        const booking = paymentData.booking;
+        const tour = booking.tour;
+        const user = booking.user;
+        const guests = booking.guests || [];
+        const departureDate = booking.departureDate;
+        const promotion = booking.promotion;
+
+        // Combine all data từ API response
+        const combinedData = {
+          id: booking.id,
+          status: booking.status || "confirmed",
+          original_price: booking.original_price,
+          discount_amount: booking.discount_amount,
+          total_price: booking.total_price,
+          promotion_id: booking.promotion_id,
+          booking_date: booking.booking_date,
+          number_of_adults: booking.number_of_adults,
+          number_of_children: booking.number_of_children,
+          tour: {
+            name: tour.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Tên tour không có',
+            location: tour.destination || tour.location,
+            departure_location: tour.departure_location,
+            images: tour.images || []
+          },
+          user: {
+            name: user.name || user.full_name,
+            email: user.email
+          },
+          payment: {
+            payment_method: paymentData.payment_method,
+            status: paymentData.status,
+            amount: paymentData.amount,
+            order_id: paymentData.order_id
+          },
+          guests: guests,
+          departureDate: {
+            departure_date: departureDate?.departure_date,
+            end_date: departureDate?.end_date
+          },
+          promotion: promotion
+        };
+
+        console.log('Combined data:', combinedData);
+        setBookingData(combinedData);
+        setBookingNumber(booking.id);
+        setPaymentCompleted(true);
+      })
+      .catch(error => {
+        console.error('Failed to fetch payment data:', error);
+        console.log('Using fallback mock data due to API error');
+        
+        // Fallback với mock data dựa trên URL params
+        const amount = searchParams.get('amount') || '9360000';
+        const mockBookingData = {
+          id: "01b075eb-c3e1-4611-9d9c-3a4b227f6d9d",
+          status: "confirmed",
+          original_price: "10400000.00",
+          discount_amount: "1040000.00",
+          total_price: amount,
+          promotion_id: "promo-summer-2025",
+          booking_date: new Date().toISOString(),
+          number_of_adults: 2,
+          number_of_children: 0,
+          tour: {
+            name: "Tour khám phá Đà Nẵng - Hội An 4N3Đ",
+            location: "Đà Nẵng",
+            departure_location: "Hồ Chí Minh",
+            images: [{
+              image_url: "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg",
+              is_main: true
+            }]
+          },
+          user: {
+            name: "Guest User",
+            email: "guest@tour.com"
+          },
+          payment: {
+            payment_method: "MoMo",
+            status: "pending",
+            amount: amount,
+            order_id: orderId
+          },
+          guests: [{
+            name: "Nguyen Van A",
+            email: "guest@tour.com",
+            phone: "0123456789",
+            cccd: "089303002985"
+          }],
+          departureDate: {
+            departure_date: "2025-09-05",
+            end_date: "2025-09-08"
+          }
+        };
+        
+        setBookingData(mockBookingData);
+        setBookingNumber("01b075eb-c3e1-4611-9d9c-3a4b227f6d9d");
+        setPaymentCompleted(true);
+      });
+  }, [searchParams, mounted]);
+
+  // Show loading if not mounted yet to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang khởi tạo...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!bookingData || !paymentCompleted) {
     return (
@@ -132,11 +301,27 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
     bookingStatus: bookingInfo.status
   });
 
-  let tourImage = "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg";
+  // Logic lấy hình ảnh từ API response của tour
+  let tourImage = "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg"; // Default fallback
   if (tourInfo?.images && tourInfo.images.length > 0) {
     const mainImage = tourInfo.images.find((img: any) => img.is_main);
     tourImage = mainImage?.image_url || tourInfo.images[0]?.image_url || "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg";
   }
+
+  console.log('🖼️ Tour image debug:', {
+    tourInfo,
+    tourImages: tourInfo?.images,
+    finalTourImage: tourImage
+  });
+
+  // Debug component để kiểm tra hình ảnh
+  const ImageDebug = () => (
+    <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 text-xs">
+      <p><strong>Debug Image:</strong></p>
+      <p>URL: {tourImage}</p>
+      <p>Images array: {JSON.stringify(tourInfo?.images)}</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -152,11 +337,11 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
               </p>
             </div>
             
-            {/* Layout mã tour bên trái, button bên phải */}
+            {/* Layout mã tour bên trái, button bên phải - FIXED */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6 px-4">
               <div className="bg-white rounded-lg p-4 flex-1 sm:flex-initial sm:min-w-0 sm:max-w-md">
                 <p className="text-sm text-gray-500 mb-1">Mã đặt tour</p>
-                <p className="text-sm sm:text-base font-bold text-teal-600 break-all">{bookingNumber}</p>
+                <p className="text-lg sm:text-xl font-bold text-teal-600 break-all">{bookingNumber}</p>
               </div>
               <div className="flex-shrink-0 w-full sm:w-auto">
                 <Button 
@@ -237,37 +422,43 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
         <Card>
           <CardContent className="p-6">
             <h2 className="text-xl font-semibold mb-4">Thông tin tour</h2>
-            <div className="flex gap-6">
-              {/* Hình ảnh tour - compact size */}
+            <div className="flex gap-4">
+              {/* Hình ảnh tour - lớn hơn bên trái */}
               <div className="flex-shrink-0">
-                <div className="w-48 h-32 relative rounded-lg overflow-hidden bg-gray-200">
+                <div className="w-32 h-24 relative rounded overflow-hidden bg-gray-200">
                   <Image
                     src={tourImage}
                     alt={tourInfo.name || "Tour image"}
                     fill
                     className="object-cover"
                     priority
+                    onError={(e) => {
+                      console.error('Image failed to load:', tourImage);
+                      // Fallback to local image
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/VinhHaLong.jpeg';
+                    }}
                   />
                 </div>
               </div>
               
-              {/* Thông tin chi tiết */}
-              <div className="flex-1 space-y-2">
-                <h3 className="text-lg font-semibold">{tourInfo.name}</h3>
-                <div className="flex items-center text-gray-600">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  <span>{tourInfo.location}</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  <span>Khởi hành: {departureInfo?.departure_date ? new Date(departureInfo.departure_date).toLocaleDateString("vi-VN") : ""}</span>
-                </div>
-                {departureInfo?.end_date && (
-                  <div className="flex items-center text-gray-600">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    <span>Kết thúc: {new Date(departureInfo.end_date).toLocaleDateString("vi-VN")}</span>
+              {/* Thông tin chi tiết bên phải */}
+              <div className="flex-1">
+                <h3 className="font-semibold text-base mb-2">{tourInfo.name}</h3>
+                <div className="space-y-1 text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <MapPin className="w-3 h-3 mr-1" />
+                    <span>{tourInfo.location}</span>
                   </div>
-                )}
+                  <div className="flex items-center">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    <span>Khởi hành: {departureInfo?.departure_date ? new Date(departureInfo.departure_date).toLocaleDateString("vi-VN") : ""}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="w-3 h-3 mr-1" />
+                    <span>{departureInfo ? `${departureInfo.number_of_days || 4} ngày ${(departureInfo.number_of_days || 4) - 1} đêm` : "4 ngày 3 đêm"}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -279,8 +470,12 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
             <h2 className="text-xl font-semibold mb-4">Chi tiết thanh toán</h2>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Số người (người lớn)</span>
-                <span className="font-medium">{guestsInfo.length || 1} người</span>
+                <span className="text-gray-600">Số người lớn</span>
+                <span className="font-medium">{bookingInfo.number_of_adults || 1} người</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Số trẻ em</span>
+                <span className="font-medium">{bookingInfo.number_of_children || 0} người</span>
               </div>
               
               {/* Hiển thị giá gốc */}
@@ -292,19 +487,25 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
               </div>
               
               {/* Hiển thị mã giảm giá nếu có */}
-              {bookingInfo.promo_code && (
+              {(bookingInfo.promotion_id || bookingInfo.promotion) && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <div className="flex justify-between items-center">
                     <span className="text-green-700 font-medium">
-                      ✅ Áp dụng mã giảm giá: {bookingInfo.promo_code}
+                      ✅ Áp dụng mã giảm giá: {
+                        bookingInfo.promotion?.code || 
+                        bookingInfo.promotion_id?.replace('promo-', '').toUpperCase() || 
+                        bookingInfo.promotion_id
+                      }
                     </span>
                   </div>
                   <div className="text-sm text-green-600 mt-1">
-                    {bookingInfo.promo_code === 'SUMMER2025' 
-                      ? 'Giảm giá 10% cho tất cả các tour khởi hành trong tháng 7 và 8.'
-                      : bookingInfo.promo_code === 'JULY2507'
-                      ? 'Giảm giá cuối tháng cho các du khách vừa hết tiền lương'
-                      : 'Mã giảm giá đã được áp dụng'}
+                    {bookingInfo.promotion?.description || (
+                      bookingInfo.promotion_id === 'promo-summer-2025' 
+                        ? 'Giảm giá 10% cho tất cả các tour khởi hành trong tháng 7 và 8.'
+                        : bookingInfo.promotion_id === 'promo-july-2507'
+                        ? 'Giảm giá cuối tháng cho các du khách vừa hết tiền lương'
+                        : 'Mã giảm giá đã được áp dụng'
+                    )}
                   </div>
                 </div>
               )}
@@ -320,10 +521,9 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
               )}
               
               <div className="flex justify-between">
-                <span className="text-gray-600">Giá tour sau giảm</span>
+                <span className="text-gray-600">Tổng tiền tour</span>
                 <span className="font-medium">{displayAmount.toLocaleString('vi-VN')} VNĐ</span>
               </div>
-              
               <div className="flex justify-between">
                 <span className="text-gray-600">Phí VAT</span>
                 <span className="font-medium">10%</span>
@@ -404,7 +604,7 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button
-            onClick={() => router.push('/tour')}
+            onClick={() => router.push('/')}
             variant="outline"
             className="bg-white hover:bg-gray-50"
           >

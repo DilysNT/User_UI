@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Star, Clock, MapPin, Calendar, ChevronLeft, CheckCircle2, AlertCircle, CreditCard, Wallet, Smartphone, Banknote, Tag, Percent } from "lucide-react"
+import Footer from "@/components/home/footer"
 
 export default function Payment({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -86,7 +87,7 @@ export default function Payment({ params }: { params: { id: string } }) {
       // Sử dụng booking data đã có
       const bookingInfo = booking || bookingData;
       // Sửa: truyền bookingId vào body
-      fetch('http://localhost:5001/api/momo/create-payment', {
+      fetch('http://localhost:5000/api/momo/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId, tourId })
@@ -351,7 +352,7 @@ export default function Payment({ params }: { params: { id: string } }) {
                         />
                       </div>
                       <div>
-                        <h3 className="font-medium">{tour.name || tour.title}</h3>
+                        <h3 className="font-medium">{(tour.name || tour.title)?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Tên tour không có'}</h3>
                         {(tour.rating || tour.reviews) && (
                           <div className="flex items-center text-sm text-gray-600 mt-1">
                             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 mr-1" />
@@ -464,12 +465,7 @@ export default function Payment({ params }: { params: { id: string } }) {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-100 py-6 mt-12">
-        <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>© 2025 Travel Tour. Tất cả quyền được bảo lưu.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

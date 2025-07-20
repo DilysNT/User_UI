@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Footer from "@/components/home/footer"
 
 export default function GalleryPage() {
   const [images, setImages] = useState<string[]>([])
@@ -40,9 +41,10 @@ export default function GalleryPage() {
   }, [])
 
   return (
-    <section className="py-16">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center gap-2 mb-4">
+    <div>
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-2 mb-4">
           <button
             className="mr-2 p-2 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-400"
             onClick={() => router.push("/")}
@@ -109,5 +111,7 @@ export default function GalleryPage() {
         )}
       </div>
     </section>
+    <Footer />
+    </div>
   )
 } 

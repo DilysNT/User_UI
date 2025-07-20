@@ -13,6 +13,7 @@ import { Checkbox } from "../../components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { Textarea } from "../../components/ui/textarea"
 import { Star, Clock, MapPin, Calendar, ChevronLeft, CheckCircle, X } from "lucide-react"
+import Footer from "@/components/home/footer"
 import VATInfo from "./VATInfo"
 import { 
   calculateCommissionPreview, 
@@ -46,6 +47,9 @@ export default function Booking({ params }: { params: { id: string } }) {
     discount: number;
     final: number;
   } | null>(null);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  const [userInfo, setUserInfo] = useState<any>(null);
+  const [loadingUserInfo, setLoadingUserInfo] = useState(false);
   type FormData = {
     contactInfo: {
       fullName: string;
@@ -136,6 +140,15 @@ export default function Booking({ params }: { params: { id: string } }) {
           }
         }
 
+        // Check if user is logged in - Kiểm tra cả 2 tên token có thể có
+        const authToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+        setIsUserLoggedIn(!!authToken);
+        console.log('🔐 Auth check:', { 
+          hasAuthToken: !!localStorage.getItem('authToken'),
+          hasToken: !!localStorage.getItem('token'),
+          isUserLoggedIn: !!authToken 
+        });
+
       } catch {
         setTourData({
           id: params.id,
@@ -156,6 +169,90 @@ export default function Booking({ params }: { params: { id: string } }) {
       }
     }
   }, [params.id]);
+
+  // Theo dõi thay đổi authentication status trong thời gian thực
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const authToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const newLoginStatus = !!authToken;
+      
+      if (newLoginStatus !== isUserLoggedIn) {
+        setIsUserLoggedIn(newLoginStatus);
+        console.log('🔄 Auth status changed:', { 
+          from: isUserLoggedIn, 
+          to: newLoginStatus,
+          token: authToken ? 'exists' : 'missing'
+        });
+      }
+    };
+
+    // Kiểm tra ngay lập tức
+    checkAuthStatus();
+
+    // Lắng nghe sự kiện storage để phát hiện thay đổi từ tab khác
+    window.addEventListener('storage', checkAuthStatus);
+    
+    // Kiểm tra định kỳ mỗi 2 giây (fallback)
+    const interval = setInterval(checkAuthStatus, 2000);
+
+    return () => {
+      window.removeEventListener('storage', checkAuthStatus);
+      clearInterval(interval);
+    };
+  }, [isUserLoggedIn]);
+
+  // Fetch user info khi đã đăng nhập để tự động fill form
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (!isUserLoggedIn) {
+        setUserInfo(null);
+        return;
+      }
+
+      setLoadingUserInfo(true);
+      try {
+        const authToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+        if (!authToken) return;
+
+        const response = await fetch('http://localhost:5000/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const user = data.user || data;
+          setUserInfo(user);
+          
+          console.log('✅ Fetched user info:', user);
+          
+          // Tự động fill thông tin liên hệ từ thông tin tài khoản
+          setFormData(prev => ({
+            ...prev,
+            contactInfo: {
+              fullName: user.name || user.username || "",
+              email: user.email || "",
+              phone: prev.contactInfo.phone, // Giữ nguyên phone nếu đã nhập
+              address: prev.contactInfo.address, // Giữ nguyên CCCD nếu đã nhập
+            }
+          }));
+          
+        } else {
+          console.warn('❌ Failed to fetch user info:', response.status);
+          setUserInfo(null);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching user info:', error);
+        setUserInfo(null);
+      } finally {
+        setLoadingUserInfo(false);
+      }
+    };
+
+    fetchUserInfo();
+  }, [isUserLoggedIn]);
 
   useEffect(() => {
     if (!tourData || !tourData.id) return;
@@ -465,15 +562,48 @@ export default function Booking({ params }: { params: { id: string } }) {
       alert("Vui lòng chọn ngày khởi hành ở trang chi tiết tour trước khi đặt!");
       return;
     }
-    // 1. Tạo booking object đúng format
-    // Nếu có user đăng nhập, lấy user_id từ localStorage/session, nếu không thì không gửi user_id
-    // Tạo mảng guests, luôn có ít nhất 1 khách đại diện
+
+    // Validation cho user đã đăng nhập
+    if (isUserLoggedIn && !userInfo) {
+      alert("Đang tải thông tin tài khoản. Vui lòng đợi một chút!");
+      return;
+    }
+
+    if (isUserLoggedIn && userInfo && !userInfo.id) {
+      alert("Không thể lấy thông tin tài khoản. Vui lòng đăng nhập lại!");
+      return;
+    }
+
+    try {
+      console.group('🚀 Starting Unified Booking Process');
+      console.log('User Type:', isUserLoggedIn ? 'AUTHENTICATED_USER' : 'GUEST_USER');
+      console.log('User Info:', isUserLoggedIn ? userInfo : 'N/A (Guest)');
+      console.log('Has Auth Token:', !!localStorage.getItem('authToken'));
+      console.log('Has Token:', !!localStorage.getItem('token'));
+    // 1. Chuẩn bị booking payload theo format mới
+    // Nếu có user đăng nhập, API sẽ tự động lấy user_id từ token
+    // Nếu là guest, API sẽ tự động assign guest user ID
+    
+    // Sử dụng thông tin từ userInfo nếu đã đăng nhập, ngược lại dùng form data
+    const contactInfo = isUserLoggedIn && userInfo ? {
+      fullName: userInfo.name || userInfo.username || formData.contactInfo.fullName,
+      email: userInfo.email,
+      phone: formData.contactInfo.phone,
+      address: formData.contactInfo.address,
+    } : formData.contactInfo;
+    
+    console.log('📧 Contact info for booking:', {
+      isLoggedIn: isUserLoggedIn,
+      fromUserInfo: isUserLoggedIn && userInfo,
+      contactInfo
+    });
+    
     const guests = [
       {
-        name: formData.contactInfo.fullName,
-        phone: formData.contactInfo.phone,
-        email: formData.contactInfo.email,
-        cccd: formData.contactInfo.address,
+        name: contactInfo.fullName,
+        phone: contactInfo.phone,
+        email: contactInfo.email,
+        cccd: contactInfo.address,
       }
     ];
     // Nếu có thêm người tham gia, bổ sung vào guests
@@ -484,7 +614,7 @@ export default function Booking({ params }: { params: { id: string } }) {
         guests.push({
           name: p.fullName,
           phone: p.phone,
-          email: formData.contactInfo.email,
+          email: contactInfo.email, // Sử dụng email từ contactInfo đã xử lý
           cccd: p.idNumber,
         });
       });
@@ -495,12 +625,19 @@ export default function Booking({ params }: { params: { id: string } }) {
       departure_date_id: tourData.departure_date_id,
       number_of_adults: tourData.adults,
       number_of_children: tourData.children,
-      status: 'pending',
       guests,
-      // Thông tin agency để tính phí VAT
-      agency_id: tourData.agency_id || null,
-      referral_code: tourData.referral_code || null,
     };
+
+    // ✅ SIMPLIFIED APPROACH: Backend auto-detect user type
+    if (isUserLoggedIn && userInfo && userInfo.id) {
+      // User đã đăng nhập - gửi user_id để link với tài khoản
+      bookingPayload.user_id = userInfo.id;
+      console.log('👤 Authenticated user booking - including user_id:', userInfo.id);
+    } else {
+      // Guest booking - KHÔNG gửi user_id, để backend auto-detect và xử lý
+      console.log('🎫 Guest booking - no user_id sent, backend will auto-detect from missing Authorization header');
+      // Không thêm user_id vào payload
+    }
 
     // Tính toán pricing theo logic backend mới
     const pricingData = calculateBookingData(
@@ -531,39 +668,75 @@ export default function Booking({ params }: { params: { id: string } }) {
     if (promotionId) {
       bookingPayload.promotion_id = promotionId;
     }
+
+    // 2. Chuẩn bị headers cho request - hỗ trợ cả user đăng nhập và guest
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
     
-    // Nếu có user đăng nhập thì thêm user_id
-    const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
-    if (userId) {
-      bookingPayload.user_id = userId;
-    } else {
-      bookingPayload.user_id = "3ca8bb89-a406-4deb-96a7-dab4d9be3cc1"; // id của guest3
+    // Thêm Authorization header nếu user đã đăng nhập - Kiểm tra cả 2 tên token
+    const authToken = typeof window !== 'undefined' ? 
+      (localStorage.getItem('authToken') || localStorage.getItem('token')) : null;
+
+    console.log('📦 Final Booking Payload:', {
+      ...bookingPayload,
+      hasPromotion: !!promotionId,
+      totalPrice: bookingPayload.total_price,
+      guestCount: bookingPayload.guests.length,
+      userType: isUserLoggedIn ? 'AUTHENTICATED' : 'GUEST',
+      userId: bookingPayload.user_id || 'Not included (Guest auto-detect)',
+      hasUserId: !!bookingPayload.user_id,
+      authorizationHeader: !!authToken ? 'Present' : 'Missing (Guest auto-detect)'
+    });
+    
+    console.log('🔑 Auth token check for request:', { 
+      hasAuthToken: !!localStorage.getItem('authToken'),
+      hasToken: !!localStorage.getItem('token'),
+      willUseToken: !!authToken,
+      isUserLoggedIn
+    });
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     
-    if (promotionId) {
-      bookingPayload.promotion_id = promotionId;
-      bookingPayload.promo_code = promoCode;
-    }
-    
-    // 2. Gửi 1 request duy nhất
+    // 3. ✅ AUTO-DETECT APPROACH - Backend detects user type automatically
+    // - Authorization header present: Authenticated user (extract user_id from token)
+    // - No Authorization header: Guest user (backend handles guest user creation)
+    // - user_id only included for authenticated users
     const bookingRes = await fetch('http://localhost:5000/api/bookings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(bookingPayload)
     });
     
     if (!bookingRes.ok) {
-      alert('Đặt tour thất bại!');
+      const errorData = await bookingRes.json();
+      alert(`Đặt tour thất bại! ${errorData.message || 'Vui lòng thử lại.'}`);
       return;
     }
     
     // Lưu thông tin booking vào localStorage để dùng cho Payment
     const bookingResult = await bookingRes.json();
     
-    // 3. Tự động tính phí VAT nếu có agency_id
-    if (tourData.agency_id && bookingResult.id) {
+    // Hiển thị thông báo thành công dựa trên booking type
+    if (bookingResult.bookingType === 'AUTHENTICATED_USER') {
+      console.log('✅ Đặt tour thành công cho tài khoản đã đăng nhập');
+    } else {
+      console.log('✅ Đặt tour thành công cho khách vãng lai');
+    }
+    
+    console.log('📝 Booking result:', {
+      bookingType: bookingResult.bookingType,
+      message: bookingResult.message,
+      bookingId: bookingResult.data?.id
+    });
+    
+    // 3. Tự động tính phí VAT nếu có agency_id (sử dụng booking ID từ response)
+    const bookingId = bookingResult.data?.id || bookingResult.id;
+    if (tourData.agency_id && bookingId) {
       try {
-        const commissionResult = await calculateBookingCommission(bookingResult.id);
+        const commissionResult = await calculateBookingCommission(bookingId);
         if (commissionResult) {
           saveCommissionTracking(commissionResult);
           console.log('✅ VAT calculated and saved:', commissionResult);
@@ -588,7 +761,7 @@ export default function Booking({ params }: { params: { id: string } }) {
         promotion_id: promotionId,
         promo_description: promoDescription
       },
-      booking: bookingResult
+      booking: bookingResult.data || bookingResult // Hỗ trợ cả 2 format response
     };
     
     localStorage.setItem("bookingData", JSON.stringify(paymentData));
@@ -599,7 +772,21 @@ export default function Booking({ params }: { params: { id: string } }) {
     console.log('🧹 Cleared saved booking data after successful submission');
     
     // Chuyển hướng sang trang payment với bookingId vừa tạo
-    router.push(`/tour/${bookingResult.id}/payment`);
+    const finalBookingId = bookingResult.data?.id || bookingResult.id;
+    router.push(`/tour/${finalBookingId}/payment`);
+    
+    console.groupEnd();
+    
+    } catch (error) {
+      console.error('❌ Booking Error:', error);
+      console.groupEnd();
+      
+      if (error instanceof Error) {
+        alert(`Đặt tour thất bại: ${error.message}`);
+      } else {
+        alert('Đặt tour thất bại! Vui lòng thử lại.');
+      }
+    }
   }
 
   return (
@@ -613,7 +800,7 @@ export default function Booking({ params }: { params: { id: string } }) {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-green-800 mb-2 text-base">
-                🎉 Áp dụng mã giảm giá thành công!
+                Áp dụng mã giảm giá thành công!
               </h3>
               <div className="text-sm text-green-700 space-y-1.5">
                 <div className="flex justify-between items-center">
@@ -665,6 +852,14 @@ export default function Booking({ params }: { params: { id: string } }) {
                 Đã lưu dữ liệu
               </span>
             )}
+            {/* Hiển thị trạng thái user */}
+            <span className={`ml-2 text-sm px-2 py-1 rounded-full ${
+              isUserLoggedIn 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'bg-orange-100 text-orange-800'
+            }`}>
+              {isUserLoggedIn ? 'Tài khoản' : 'Khách vãng lai'}
+            </span>
           </h1>
         </div>
 
@@ -676,58 +871,151 @@ export default function Booking({ params }: { params: { id: string } }) {
               {/* Thông tin liên hệ */}
               <Card className="mb-8">
                 <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">Thông tin liên hệ</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName">
-                        Họ và tên <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="fullName"
-                        placeholder="Nhập họ và tên"
-                        required
-                        value={formData.contactInfo.fullName}
-                        onChange={(e) => handleInputChange("contactInfo", "fullName", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">
-                        Email <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="example@email.com"
-                        required
-                        value={formData.contactInfo.email}
-                        onChange={(e) => handleInputChange("contactInfo", "email", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">
-                        Số điện thoại <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="phone"
-                        placeholder="0912345678"
-                        required
-                        value={formData.contactInfo.phone}
-                        onChange={(e) => handleInputChange("contactInfo", "phone", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="address">
-                        Số CCCD <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="address"
-                        placeholder="Nhập số CCCD"
-                        required
-                        value={formData.contactInfo.address}
-                        onChange={(e) => handleInputChange("contactInfo", "address", e.target.value)}
-                      />
-                    </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">Thông tin liên hệ</h2>
+                    {isUserLoggedIn && userInfo && (
+                      <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Tự động từ tài khoản: {userInfo.email}</span>
+                      </div>
+                    )}
+                    {loadingUserInfo && (
+                      <div className="text-sm text-gray-500">
+                        Đang tải thông tin tài khoản...
+                      </div>
+                    )}
                   </div>
+                  
+                  {isUserLoggedIn && userInfo ? (
+                    // Hiển thị thông tin đã đăng nhập (read-only)
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Họ và tên</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-700">
+                          {userInfo.name || userInfo.username || "Chưa cập nhật"}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-700">
+                          {userInfo.email}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">
+                          Số điện thoại <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="phone"
+                          placeholder="Nhập số điện thoại"
+                          required
+                          pattern="[0-9]{10,11}"
+                          title="Số điện thoại phải có 10-11 chữ số"
+                          minLength={10}
+                          maxLength={11}
+                          value={formData.contactInfo.phone}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '');
+                            handleInputChange("contactInfo", "phone", value);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="address">
+                          Số CCCD <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="address"
+                          placeholder="Nhập số CCCD"
+                          required
+                          pattern="[0-9]{12}"
+                          title="Số CCCD phải có 12 chữ số"
+                          minLength={12}
+                          maxLength={12}
+                          value={formData.contactInfo.address}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+                            handleInputChange("contactInfo", "address", value);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    // Form nhập thông tin cho khách vãng lai
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fullName">
+                          Họ và tên <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="fullName"
+                          placeholder="Nhập họ và tên"
+                          required
+                          minLength={2}
+                          maxLength={50}
+                          title="Họ tên phải có từ 2-50 ký tự"
+                          value={formData.contactInfo.fullName}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^a-zA-ZÀ-ỹ\s]/g, '');
+                            handleInputChange("contactInfo", "fullName", value);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">
+                          Email <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="example@email.com"
+                          required
+                          pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                          title="Vui lòng nhập email hợp lệ"
+                          value={formData.contactInfo.email}
+                          onChange={(e) => handleInputChange("contactInfo", "email", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">
+                          Số điện thoại <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="phone"
+                          placeholder="0912345678"
+                          required
+                          pattern="[0-9]{10,11}"
+                          title="Số điện thoại phải có 10-11 chữ số"
+                          minLength={10}
+                          maxLength={11}
+                          value={formData.contactInfo.phone}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '');
+                            handleInputChange("contactInfo", "phone", value);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="address">
+                          Số CCCD <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="address"
+                          placeholder="Nhập số CCCD"
+                          required
+                          pattern="[0-9]{12}"
+                          title="Số CCCD phải có 12 chữ số"
+                          minLength={12}
+                          maxLength={12}
+                          value={formData.contactInfo.address}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+                            handleInputChange("contactInfo", "address", value);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -847,6 +1135,44 @@ export default function Booking({ params }: { params: { id: string } }) {
                 </CardContent>
               </Card>
 
+              {/* Thông tin quy trình booking */}
+              <Card className="mb-8">
+                <CardContent className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Quy trình đặt tour</h2>
+                  {isUserLoggedIn ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-blue-600 font-semibold">A</span>
+                        </div>
+                        <h3 className="font-semibold text-blue-800">Đặt tour với tài khoản</h3>
+                      </div>
+                      <ul className="text-sm text-blue-700 space-y-2 list-disc pl-5">
+                        <li>Booking sẽ được lưu vào tài khoản của bạn</li>
+                        <li>Có thể xem lịch sử booking trong "Quản lý đặt tour"</li>
+                        <li>Nhận thông báo qua email đã đăng ký</li>
+                        <li>Hỗ trợ tốt hơn khi có vấn đề</li>
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-orange-600 font-semibold">G</span>
+                        </div>
+                        <h3 className="font-semibold text-orange-800">Đặt tour khách vãng lai</h3>
+                      </div>
+                      <ul className="text-sm text-orange-700 space-y-2 list-disc pl-5">
+                        <li>Thông tin booking sẽ được gửi qua email người đại diện</li>
+                        <li>Vui lòng lưu giữ email xác nhận để tra cứu</li>
+                        <li>Có thể tra cứu booking bằng email và mã booking</li>
+                        <li className="font-medium">Khuyến nghị: Đăng ký tài khoản để quản lý booking tốt hơn!</li>
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Điều khoản và điều kiện */}
               <Card className="mb-8">
                 <CardContent className="p-6">
@@ -917,7 +1243,7 @@ export default function Booking({ params }: { params: { id: string } }) {
 
               <div className="flex justify-end">
                 <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white px-8">
-                  Tiếp tục thanh toán
+                  {isUserLoggedIn ? 'Tiếp tục thanh toán' : 'Đặt tour (Guest)'}
                 </Button>
               </div>
             </form>
@@ -949,7 +1275,7 @@ export default function Booking({ params }: { params: { id: string } }) {
                       />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-base">{tourData.name}</h3>
+                      <h3 className="font-semibold text-base">{tourData.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Không có tên tour'}</h3>
                       <div className="flex items-center text-sm text-gray-600 mt-1">
                         <MapPin className="w-4 h-4 mr-1" />
                         <span>{tourData.location || 'Đà Lạt'}</span>
@@ -1051,12 +1377,7 @@ export default function Booking({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-100 py-6 mt-12">
-        <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-          <p>© 2025 Travel Tour. Tất cả quyền được bảo lưu.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

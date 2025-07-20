@@ -82,7 +82,7 @@ export default function FeaturedDestinations() {
                     {/* Overlay text */}
                     <div className="relative z-10 p-6 w-full flex flex-col justify-end h-full">
                       <div className="text-2xl font-bold text-white mb-2 flex items-center">
-                        {tour.name}
+                        {tour.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Tên tour không có'}
                         <span className="text-sky-400 text-3xl ml-2">.</span>
                       </div>
                       <div className="text-white/90 text-base mb-2 line-clamp-2">{tour.description}</div>

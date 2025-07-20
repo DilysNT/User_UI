@@ -215,7 +215,7 @@ export default function ProfileModal({ open, onClose }) {
   if (!user) {
     console.log('ProfileModal: user is null, loading...');
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex flex-col justify-center items-center min-h-screen z-50">
+      <div className="fixed inset-0 bg-black bg-opacity-40 flex flex-col justify-center items-center min-h-screen z-[10000]">
         <div className="bg-white rounded-lg p-8 w-full max-w-4xl relative max-h-[90vh] overflow-y-auto flex items-center justify-center">
           <span>Đang tải thông tin người dùng...</span>
         </div>
@@ -224,7 +224,7 @@ export default function ProfileModal({ open, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex flex-col justify-center items-center min-h-screen z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex flex-col justify-center items-center min-h-screen z-[10000]">
       <div className="bg-white rounded-lg p-8 w-full max-w-4xl max-h-[90vh] relative flex flex-col">
         <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>✕</button>
         <div className="flex flex-col md:flex-row">

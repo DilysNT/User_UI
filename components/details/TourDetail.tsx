@@ -82,10 +82,29 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
   }, [tourId]);
 
   const handleChangeAdults = (delta: number) => {
-    setAdults((prev) => Math.max(1, prev + delta));
+    setAdults((prev) => {
+      const newValue = prev + delta;
+      // Validation: min 1, max theo tour.max_participants
+      if (newValue < 1) return 1;
+      if (tour.max_participants && newValue > tour.max_participants) {
+        alert(`Số lượng người lớn không được vượt quá ${tour.max_participants} người`);
+        return prev;
+      }
+      return newValue;
+    });
   };
+  
   const handleChangeChildren = (delta: number) => {
-    setChildren((prev) => Math.max(0, prev + delta));
+    setChildren((prev) => {
+      const newValue = prev + delta;
+      // Validation: min 0, max theo tour.max_participants (tổng với adults)
+      if (newValue < 0) return 0;
+      if (tour.max_participants && (adults + newValue) > tour.max_participants) {
+        alert(`Tổng số người không được vượt quá ${tour.max_participants} người`);
+        return prev;
+      }
+      return newValue;
+    });
   };
 
   const totalPrice = tour && tour.price
@@ -209,7 +228,7 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
           <div className="lg:col-span-2">
             {/* Tour Title */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{tour.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{tour.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Tên tour không có'}</h1>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <div className="flex items-center">
                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 mr-1" />
@@ -354,7 +373,15 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                     <ul className="list-disc pl-5">
                       {hotels.length === 0 && <li className="text-gray-500">Chưa có dữ liệu.</li>}
                       {hotels.map((h, i) => (
-                        <li key={h.id || i}>{h.name || h.hotel_name} {h.address ? `- ${h.address}` : ""}</li>
+                        <li key={h.id_hotel || h.id || i}>
+                          <span className="font-medium">{h.ten_khach_san || h.name || h.hotel_name}</span>
+                          {h.ten_phong && <span className="text-gray-600"> - {h.ten_phong}</span>}
+                          {h.star_rating && (
+                            <span className="text-yellow-500 ml-2">
+                              {Array.from({length: h.star_rating}, (_, i) => '⭐').join('')}
+                            </span>
+                          )}
+                        </li>
                       ))}
                     </ul>
                   </AccordionContent>
@@ -431,7 +458,15 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                       <SelectValue placeholder="Chọn ngày khởi hành" />
                     </SelectTrigger>
                     <SelectContent>
-                      {departureDates.map((dateObj: any) => (
+                      {departureDates
+                        .filter((dateObj: any) => {
+                          if (!dateObj.departure_date) return false;
+                          const departureDate = new Date(dateObj.departure_date);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0); // Reset time to start of day
+                          return departureDate >= today; // Chỉ hiển thị ngày từ hôm nay trở đi
+                        })
+                        .map((dateObj: any) => (
                         <SelectItem key={dateObj.id || dateObj.departureDates_id} value={dateObj.id || dateObj.departureDates_id}>
                           {dateObj.departure_date ? new Date(dateObj.departure_date).toLocaleDateString("vi-VN") : ""}
                         </SelectItem>
@@ -447,17 +482,49 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                     <div>
                       <label className="block text-sm text-gray-600 mb-2">Người lớn</label>
                       <div className="flex items-center justify-between bg-gray-50 border border-gray-300 rounded-md px-3 py-2">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-200" onClick={() => handleChangeAdults(-1)} disabled={adults <= 1}>-</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 hover:bg-gray-200" 
+                          onClick={() => handleChangeAdults(-1)} 
+                          disabled={adults <= 1}
+                        >
+                          -
+                        </Button>
                         <span className="font-medium">{adults}</span>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-200" onClick={() => handleChangeAdults(1)}>+</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 hover:bg-gray-200" 
+                          onClick={() => handleChangeAdults(1)}
+                          disabled={tour.max_participants && adults >= tour.max_participants}
+                        >
+                          +
+                        </Button>
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm text-gray-600 mb-2">Trẻ em</label>
                       <div className="flex items-center justify-between bg-gray-50 border border-gray-300 rounded-md px-3 py-2">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-200" onClick={() => handleChangeChildren(-1)} disabled={children <= 0}>-</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 hover:bg-gray-200" 
+                          onClick={() => handleChangeChildren(-1)} 
+                          disabled={children <= 0}
+                        >
+                          -
+                        </Button>
                         <span className="font-medium">{children}</span>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-200" onClick={() => handleChangeChildren(1)}>+</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 hover:bg-gray-200" 
+                          onClick={() => handleChangeChildren(1)}
+                          disabled={tour.max_participants && (adults + children) >= tour.max_participants}
+                        >
+                          +
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -478,13 +545,36 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                   {selectedDepartureDateId === "" && (
                     <div className="text-red-500 text-sm mb-2">Vui lòng chọn ngày khởi hành trước khi đặt tour.</div>
                   )}
+                  {tour.min_participants && (adults + children) < tour.min_participants && (
+                    <div className="text-red-500 text-sm mb-2">
+                      Số lượng người tối thiểu là {tour.min_participants} người.
+                    </div>
+                  )}
+                  {tour.max_participants && (adults + children) > tour.max_participants && (
+                    <div className="text-red-500 text-sm mb-2">
+                      Số lượng người không được vượt quá {tour.max_participants} người.
+                    </div>
+                  )}
                   <Button
                     className="w-full bg-teal-500 hover:bg-teal-600 text-white py-3 font-medium"
                     onClick={() => {
-                      if (!selectedDepartureDateId) return;
+                      if (!selectedDepartureDateId) {
+                        alert('Vui lòng chọn ngày khởi hành');
+                        return;
+                      }
+                      if (tour.min_participants && (adults + children) < tour.min_participants) {
+                        alert(`Số lượng người tối thiểu là ${tour.min_participants} người`);
+                        return;
+                      }
+                      if (tour.max_participants && (adults + children) > tour.max_participants) {
+                        alert(`Số lượng người không được vượt quá ${tour.max_participants} người`);
+                        return;
+                      }
                       handleBookTour();
                     }}
-                    disabled={!selectedDepartureDateId}
+                    disabled={!selectedDepartureDateId || 
+                             (tour.min_participants && (adults + children) < tour.min_participants) ||
+                             (tour.max_participants && (adults + children) > tour.max_participants)}
                   >
                     Xác nhận đặt tour
                   </Button>
@@ -495,79 +585,7 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="text-2xl font-bold text-orange-500 mb-4">TRAVEL TOUR</div>
-              <p className="text-gray-400 text-sm">
-                Khám phá {tour.destination} cùng chúng tôi với những trải nghiệm du lịch tuyệt vời nhất.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Liên kết</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Về chúng tôi
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Tour {tour.destination}
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Liên hệ
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Blog
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Hỗ trợ</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Trung tâm trợ giúp
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Chính sách hủy
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Điều khoản
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white">
-                    Bảo mật
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Liên hệ</h3>
-              <div className="space-y-2 text-sm text-gray-400">
-                <div>Email: info@traveltour.vn</div>
-                <div>Điện thoại: +84 123 456 789</div>
-                <div>Địa chỉ: {tour.departure_location}</div>
-              </div>
-            </div>
-          </div>
-          <Separator className="my-8 bg-gray-700" />
-          <div className="text-center text-sm text-gray-400">© 2025 Travel Tour. Tất cả quyền được bảo lưu.</div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

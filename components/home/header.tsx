@@ -51,7 +51,7 @@ export default function Header({ textColor = "white" }: HeaderProps) {
         localStorage.removeItem('user');
         return;
       }
-      fetch('http://localhost:5001/api/auth/me', {
+      fetch('http://localhost:5000/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       })
         .then(res => {

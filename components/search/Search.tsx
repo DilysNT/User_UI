@@ -311,7 +311,7 @@ export default function SearchPage() {
                     </div>
                     <div className="flex-1 p-5 flex justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">{tour.name}</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">{tour.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Tên tour không có'}</h3>
                         <div className="flex gap-4 mb-3 text-sm text-gray-600">
                           <span className="flex items-center gap-1" title="Thời gian">
                             <Clock className="w-4 h-4" />
