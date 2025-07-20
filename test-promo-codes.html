@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Mã Giảm Giá</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-case { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 2px solid #ddd; 
+            border-radius: 8px; 
+        }
+        .summer { border-color: #ffa500; background-color: #fff8dc; }
+        .july { border-color: #ff6b6b; background-color: #ffe5e5; }
+        .no-promo { border-color: #999; background-color: #f5f5f5; }
+        a { 
+            display: inline-block; 
+            padding: 10px 20px; 
+            background-color: #007bff; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 10px 5px; 
+        }
+        a:hover { background-color: #0056b3; }
+        .expected { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>🎯 Test Mã Giảm Giá - Confirmation Page</h1>
+    
+    <div class="test-case summer">
+        <h2>🏖️ Test SUMMER2025 (Giảm 10%)</h2>
+        <p><strong>Mô tả:</strong> Giảm giá 10% cho tất cả các tour khởi hành trong tháng 7 và 8</p>
+        <p class="expected"><strong>Kết quả mong đợi:</strong> 3.500.000đ - 350.000đ = 3.150.000đ</p>
+        <a href="http://localhost:3000/tour/387984fb-af7d-4a86-8b5b-469d2dddd262/confirmation?promo=SUMMER2025" target="_blank">
+            Xem SUMMER2025
+        </a>
+    </div>
+    
+    <div class="test-case july">
+        <h2>💰 Test JULY2507 (Giảm 500.000đ)</h2>
+        <p><strong>Mô tả:</strong> Giảm giá cuối tháng cho các du khách vừa hết tiền lương</p>
+        <p class="expected"><strong>Kết quả mong đợi:</strong> 3.500.000đ - 500.000đ = 3.000.000đ</p>
+        <a href="http://localhost:3000/tour/387984fb-af7d-4a86-8b5b-469d2dddd262/confirmation?promo=JULY2507" target="_blank">
+            Xem JULY2507
+        </a>
+    </div>
+    
+    <div class="test-case no-promo">
+        <h2>🚫 Test Không Mã Giảm Giá</h2>
+        <p><strong>Mô tả:</strong> Giá gốc không thay đổi</p>
+        <p class="expected"><strong>Kết quả mong đợi:</strong> 3.500.000đ</p>
+        <a href="http://localhost:3000/tour/387984fb-af7d-4a86-8b5b-469d2dddd262/confirmation" target="_blank">
+            Xem Không Mã
+        </a>
+    </div>
+    
+    <div style="margin-top: 30px; padding: 20px; background-color: #e8f5e8; border-radius: 8px;">
+        <h3>✅ Kiểm tra điểm sau:</h3>
+        <ul>
+            <li><strong>SUMMER2025:</strong> Hiện thông tin mã giảm giá + giảm 350.000đ</li>
+            <li><strong>JULY2507:</strong> Hiện thông tin mã giảm giá + giảm 500.000đ (KHÔNG phải 3.500.000đ)</li>
+            <li><strong>Không mã:</strong> Chỉ hiện giá gốc 3.500.000đ</li>
+            <li><strong>Tất cả:</strong> Hiện "Phí VAT: 10%" và layout responsive</li>
+        </ul>
+        
+        <div style="margin-top: 15px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;">
+            <h4>⚠️ Lưu ý quan trọng:</h4>
+            <p><strong>URL đúng:</strong> <code>/tour/[id]/confirmation</code> (KHÔNG phải <code>/booking/[id]</code>)</p>
+            <p><strong>Trang booking:</strong> <code>/booking/[id]</code> - chưa có logic mã giảm giá</p>
+            <p><strong>Trang confirmation:</strong> <code>/tour/[id]/confirmation</code> - đã có logic mã giảm giá</p>
+        </div>
+    </div>
+</body>
+</html>

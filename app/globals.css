@@ -1,0 +1,377 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Nico+Moji&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    
+    /* 3D Scene Variables */
+    --auth-bg: #9CBDB5;
+    --auth-primary: #7BBCB0;
+    --auth-shadow: rgba(0, 0, 0, 0.1);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  font-family: 'Montserrat', Arial, Helvetica, sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+/* Chỉ in đậm cho tiêu đề */
+h1, h2, h3, .font-bold, .font-semibold {
+  font-weight: 700 !important;
+}
+  }
+
+  /* Ensure smooth rendering for 3D content */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Optimize for WebGL performance */
+  canvas {
+    display: block;
+    outline: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+}
+
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* 3D Scene Optimization */
+  .scene-3d {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .scene-3d canvas {
+    width: 100% !important;
+    height: 100% !important;
+    transform: translateZ(0); /* Force hardware acceleration */
+    will-change: transform;
+  }
+
+  /* Auth Layout Specific Styles */
+  .auth-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .auth-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.1),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .auth-hero {
+    background: var(--auth-bg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(156, 189, 181, 0.9) 0%,
+      rgba(123, 188, 176, 0.8) 50%,
+      rgba(156, 189, 181, 0.9) 100%
+    );
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .auth-content {
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Form Styles */
+  .auth-input {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #e5e7eb;
+    padding: 0.75rem 0;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    width: 100%;
+    outline: none;
+  }
+
+  .auth-input:focus {
+    border-bottom-color: var(--auth-primary);
+    box-shadow: 0 2px 0 0 var(--auth-primary);
+  }
+
+  .auth-button {
+    background: var(--auth-primary);
+    color: white;
+    border: none;
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-button:hover {
+    background: #6ba89e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(123, 188, 176, 0.3);
+  }
+
+  .auth-button:active {
+    transform: translateY(0);
+  }
+
+  .social-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .social-button:hover {
+    border-color: #d1d5db;
+    background: #f9fafb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Loading Animation for 3D Scene */
+  .scene-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Performance Optimizations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Responsive Design for 3D */
+  @media (max-width: 1024px) {
+    .auth-hero {
+      display: none;
+    }
+    
+    .auth-container {
+      padding: 1rem;
+    }
+    
+    .auth-card {
+      width: 100%;
+      max-width: 400px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .auth-card {
+      margin: 0;
+      border-radius: 0;
+      box-shadow: none;
+      background: white;
+    }
+  }
+
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    .scene-3d,
+    .scene-3d * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Original utilities preserved */
+  .hero-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
+  }
+
+  .hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    z-index: -1;
+  }
+
+  .search-section {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+  }
+
+  /* Đổi màu text khi đã chọn địa điểm trong Select */
+  .select-trigger span:not([data-placeholder="true"]) {
+    color: black !important; /* Tailwind green-600 */
+  }
+}
+/* Trong file CSS global của bạn */
+header {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+.dropdown-menu {
+  z-index: 10000 !important;
+}
+
+.modal-overlay {
+  z-index: 10001 !important;
+}
+
+/* Ensure images keep aspect ratio when only width or height is set */
+img, .next-image-auto {
+  height: auto;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+/* Promo success notification animations */
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
