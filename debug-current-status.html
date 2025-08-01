@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Current Status</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .result { background: #f9f9f9; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        button { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; }
+        .status { display: inline-block; padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; margin-right: 10px; }
+        .online { background: #28a745; }
+        .offline { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Current Status</h1>
+        
+        <div class="test-section">
+            <h2>1. Quick System Status</h2>
+            <button onclick="checkSystemStatus()">Check All Systems</button>
+            <div id="systemStatus" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. API Server Status</h2>
+            <div id="apiStatus" class="result">
+                <div class="info">🔄 Testing API server connectivity...</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Frontend Status</h2>
+            <div id="frontendStatus" class="result">
+                <div class="info">ℹ️ Frontend is running on: <strong>${window.location.origin}</strong></div>
+                <div>Current page: <strong>${window.location.pathname}</strong></div>
+                <div>User agent: <strong>${navigator.userAgent.substring(0, 100)}...</strong></div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Expected Data Structure</h2>
+            <div class="result">
+                <h4>Hero Section should show:</h4>
+                <ul>
+                    <li><strong>Điểm đến:</strong> 5 điểm đến có sẵn (Đà Nẵng, Hạ Long, Đà Lạt, Hồ Chí Minh, Hà Nội)</li>
+                    <li><strong>Điểm khởi hành:</strong> 5 điểm khởi hành có sẵn (TP.HCM, Hà Nội, Đà Nẵng, Cần Thơ, Nha Trang)</li>
+                    <li><strong>Video:</strong> /home.mp4 should play in background</li>
+                    <li><strong>Search functionality:</strong> Both tour name search and filter search should work</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Test URLs</h2>
+            <div class="result">
+                <div><strong>Homepage:</strong> <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></div>
+                <div><strong>Search example:</strong> <a href="http://localhost:3000/search?destination=Đà%20Lạt&departure=TP.Hồ%20Chí%20Minh" target="_blank">Search for Đà Lạt from TP.HCM</a></div>
+                <div><strong>Tour name search:</strong> <a href="http://localhost:3000/search?tourName=Du%20lịch%20Hạ%20Long" target="_blank">Search for "Du lịch Hạ Long"</a></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function checkSystemStatus() {
+            const resultDiv = document.getElementById('systemStatus');
+            resultDiv.innerHTML = '<div class="info">🔄 Checking system status...</div>';
+            
+            const checks = [];
+            
+            // Check API endpoints
+            const apis = [
+                { name: 'Tours', url: 'http://localhost:5000/api/tours' },
+                { name: 'Locations', url: 'http://localhost:5000/api/locations' },
+                { name: 'Departure Locations', url: 'http://localhost:5000/api/departure-locations' }
+            ];
+            
+            for (const api of apis) {
+                try {
+                    const response = await fetch(api.url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        checks.push(`<div class="success">✅ ${api.name} API: <span class="status online">ONLINE</span> (${Array.isArray(data) ? data.length : 'data'} items)</div>`);
+                    } else {
+                        checks.push(`<div class="warning">⚠️ ${api.name} API: <span class="status offline">HTTP ${response.status}</span></div>`);
+                    }
+                } catch (error) {
+                    checks.push(`<div class="error">❌ ${api.name} API: <span class="status offline">OFFLINE</span> (${error.message})</div>`);
+                }
+            }
+            
+            // Check video file
+            try {
+                const videoResponse = await fetch('/home.mp4', { method: 'HEAD' });
+                if (videoResponse.ok) {
+                    checks.push(`<div class="success">✅ Video file: <span class="status online">AVAILABLE</span></div>`);
+                } else {
+                    checks.push(`<div class="warning">⚠️ Video file: <span class="status offline">MISSING</span></div>`);
+                }
+            } catch (error) {
+                checks.push(`<div class="error">❌ Video file: <span class="status offline">ERROR</span> (${error.message})</div>`);
+            }
+            
+            // Summary
+            const onlineCount = checks.filter(check => check.includes('ONLINE')).length;
+            const totalCount = checks.length;
+            
+            resultDiv.innerHTML = `
+                <div class="info">📊 System Status Summary: ${onlineCount}/${totalCount} services online</div>
+                ${checks.join('')}
+                <div class="info">
+                    <strong>Recommendation:</strong> 
+                    ${onlineCount === totalCount ? 
+                        '🎉 All systems operational! Hero section should work perfectly with real data.' : 
+                        '⚠️ Some services are offline. Hero section will use fallback data.'}
+                </div>
+            `;
+        }
+
+        async function checkAPIStatus() {
+            const resultDiv = document.getElementById('apiStatus');
+            
+            const endpoints = [
+                'http://localhost:5000/api/tours',
+                'http://localhost:5000/api/locations', 
+                'http://localhost:5000/api/departure-locations'
+            ];
+            
+            let results = [];
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint);
+                    const data = await response.json();
+                    results.push({
+                        endpoint,
+                        status: response.ok ? 'success' : 'error',
+                        data: response.ok ? data : `HTTP ${response.status}`
+                    });
+                } catch (error) {
+                    results.push({
+                        endpoint,
+                        status: 'error',
+                        data: error.message
+                    });
+                }
+            }
+            
+            resultDiv.innerHTML = results.map(result => `
+                <div class="${result.status}">
+                    ${result.status === 'success' ? '✅' : '❌'} 
+                    <strong>${result.endpoint}:</strong> 
+                    ${result.status === 'success' ? 
+                        `OK (${Array.isArray(result.data) ? result.data.length : typeof result.data} items)` : 
+                        result.data
+                    }
+                </div>
+            `).join('');
+        }
+
+        // Auto-run checks
+        window.onload = function() {
+            checkAPIStatus();
+            setTimeout(checkSystemStatus, 1000);
+        };
+    </script>
+</body>
+</html>

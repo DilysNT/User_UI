@@ -415,6 +415,8 @@ const TravelAuthPage = () => {
   const [registerSuccess, setRegisterSuccess] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginSuccess, setLoginSuccess] = useState("");
+  const [showAccountNotFound, setShowAccountNotFound] = useState(false);
+  const [notFoundEmail, setNotFoundEmail] = useState("");
   const [showOtpForm, setShowOtpForm] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]); // 6 ô nhập
@@ -447,11 +449,12 @@ const TravelAuthPage = () => {
     setIsHydrated(true);
   }, []);
 
+  // Fix infinite loop by adding dependency array
   useEffect(() => {
     setRenderCounter(prev => prev + 1);
     console.log("🔄 Auth component render #", renderCounter + 1);
     console.log("Current state - showForgot:", showForgot, "showForgotOtp:", showForgotOtp);
-  });
+  }, [showForgot, showForgotOtp, showNewPassword]); // Add dependencies
 
   useEffect(() => {
     console.log("🎯 State change detected:");
@@ -472,6 +475,16 @@ const TravelAuthPage = () => {
       ...loginData,
       [e.target.name]: e.target.value,
     });
+    
+    // Clear account not found message when user changes email
+    if (e.target.name === 'email' && showAccountNotFound) {
+      setShowAccountNotFound(false);
+    }
+    
+    // Clear login error when user types
+    if (loginError) {
+      setLoginError("");
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -571,6 +584,7 @@ const TravelAuthPage = () => {
     e.preventDefault();
     setLoginError("");
     setLoginSuccess("");
+    setShowAccountNotFound(false);
     if (!loginData.email || !loginData.password) {
       setLoginError("Vui lòng nhập email và mật khẩu.");
       return;
@@ -586,17 +600,29 @@ const TravelAuthPage = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        setLoginError(data.message || "Đăng nhập thất bại.");
+        // Handle specific error cases
+        if (res.status === 404 || data.message?.includes('not found') || data.message?.includes('không tồn tại') || data.message?.includes('User not found')) {
+          setNotFoundEmail(loginData.email);
+          setShowAccountNotFound(true);
+        } else if (res.status === 401 || data.message?.includes('password') || data.message?.includes('mật khẩu')) {
+          setLoginError("Tài khoản hoặc Mật khẩu không chính xác. Vui lòng thử lại hoặc sử dụng 'Quên mật khẩu'.");
+        } else {
+          setLoginError(data.message || "Đăng nhập thất bại.");
+        }
       } else {
         setLoginSuccess("Đăng nhập thành công!");
         localStorage.setItem('user', JSON.stringify(data.user || { email: loginData.email }));
         localStorage.setItem('token', data.token || '');
+        // Lưu user_id để các trang khác (ví dụ hủy tour) dùng
+        if (data.user && data.user.id) {
+          localStorage.setItem('user_id', data.user.id);
+        }
         setTimeout(() => {
           window.location.href = '/'; // Chuyển về trang chủ sau khi đăng nhập
         }, 500);
       }
     } catch (err) {
-      setLoginError("Lỗi kết nối máy chủ.");
+      setLoginError("Lỗi kết nối máy chủ. Vui lòng kiểm tra kết nối internet và thử lại.");
     }
   };
 
@@ -1393,6 +1419,49 @@ const TravelAuthPage = () => {
               </div>
               {loginError && <div className="text-red-500 text-sm text-center mb-2">{loginError}</div>}
               {loginSuccess && <div className="text-green-600 text-sm text-center mb-2">{loginSuccess}</div>}
+              
+              {/* Account Not Found Component */}
+              {showAccountNotFound && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-sm font-medium text-amber-800 mb-2">
+                        Tài khoản không tồn tại
+                      </h3>
+                      <p className="text-sm text-amber-700 mb-3">
+                        Email <strong>{notFoundEmail}</strong> chưa được đăng ký trong hệ thống.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAccountNotFound(false);
+                            setShowModal(true); // Show account type selection modal
+                          }}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors"
+                        >
+                          <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Tạo tài khoản mới
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAccountNotFound(false)}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors"
+                        >
+                          Thử email khác
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <form className="space-y-6 px-6 md:px-10" onSubmit={handleLogin}>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">

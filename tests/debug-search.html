@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Search</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+        pre { background: #f9f9f9; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug Search Issue</h1>
+    
+    <div class="section">
+        <h2>Test Parameters</h2>
+        <p>URL: http://localhost:3000/search?destination=Đà+Lạt&departure=TP.Hồ+Chí+Minh&startDateRange=2025-07-01&endDateRange=2025-08-31&preferredDate=2025-07-31</p>
+        <p>Decoded Parameters:</p>
+        <ul>
+            <li>destination: Đà Lạt</li>
+            <li>departure: TP.Hồ Chí Minh</li>
+            <li>startDateRange: 2025-07-01</li>
+            <li>endDateRange: 2025-08-31</li>
+            <li>preferredDate: 2025-07-31</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Step 1: Test Tours API</h2>
+        <button onclick="testToursAPI()">Fetch All Tours</button>
+        <div id="tours-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 2: Filter by Location (Đà Lạt)</h2>
+        <button onclick="filterByLocation()">Filter Tours</button>
+        <div id="location-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Filter by Departure (TP.Hồ Chí Minh)</h2>
+        <button onclick="filterByDeparture()">Filter by Departure</button>
+        <div id="departure-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 4: Check Departure Dates</h2>
+        <button onclick="checkDepartureDates()">Check Departure Dates</button>
+        <div id="dates-result"></div>
+    </div>
+
+    <script>
+        let allTours = [];
+        let filteredTours = [];
+
+        async function testToursAPI() {
+            try {
+                const response = await fetch('http://localhost:5000/api/tours');
+                const tours = await response.json();
+                allTours = Array.isArray(tours) ? tours : [];
+                
+                document.getElementById('tours-result').innerHTML = `
+                    <div class="result">
+                        <strong>Total tours: ${allTours.length}</strong>
+                        <pre>${JSON.stringify(allTours.slice(0, 3), null, 2)}</pre>
+                        <p>Sample fields: ${allTours.length > 0 ? Object.keys(allTours[0]).join(', ') : 'No tours'}</p>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('tours-result').innerHTML = `<div class="result" style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+
+        function filterByLocation() {
+            const keyword = "đà lạt";
+            filteredTours = allTours.filter(tour =>
+                (tour.name && tour.name.toLowerCase().includes(keyword)) ||
+                (tour.location && tour.location.toLowerCase().includes(keyword)) ||
+                (tour.destination && tour.destination.toLowerCase().includes(keyword))
+            );
+            
+            document.getElementById('location-result').innerHTML = `
+                <div class="result">
+                    <strong>Tours matching "Đà Lạt": ${filteredTours.length}</strong>
+                    <pre>${JSON.stringify(filteredTours.map(t => ({
+                        id: t.id,
+                        name: t.name,
+                        location: t.location,
+                        destination: t.destination
+                    })), null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        function filterByDeparture() {
+            const departure = "tp.hồ chí minh";
+            filteredTours = filteredTours.filter(tour => 
+                tour.departure_location && tour.departure_location.toLowerCase().includes(departure)
+            );
+            
+            document.getElementById('departure-result').innerHTML = `
+                <div class="result">
+                    <strong>Tours with departure "TP.Hồ Chí Minh": ${filteredTours.length}</strong>
+                    <pre>${JSON.stringify(filteredTours.map(t => ({
+                        id: t.id,
+                        name: t.name,
+                        departure_location: t.departure_location
+                    })), null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        async function checkDepartureDates() {
+            const startDateRange = new Date('2025-07-01');
+            const endDateRange = new Date('2025-08-31');
+            const results = [];
+            
+            for (const tour of filteredTours) {
+                try {
+                    const datesResponse = await fetch(`http://localhost:5000/api/departure-dates/by-tour/${tour.id}`);
+                    const dates = await datesResponse.json();
+                    
+                    if (Array.isArray(dates)) {
+                        const matchingDates = dates.filter(date => {
+                            const departureDate = new Date(date.departure_date);
+                            return departureDate >= startDateRange && departureDate <= endDateRange;
+                        });
+                        
+                        results.push({
+                            tour: tour.name,
+                            allDates: dates.length,
+                            matchingDates: matchingDates.length,
+                            dates: matchingDates
+                        });
+                    }
+                } catch (error) {
+                    results.push({
+                        tour: tour.name,
+                        error: error.message
+                    });
+                }
+            }
+            
+            document.getElementById('dates-result').innerHTML = `
+                <div class="result">
+                    <strong>Departure Dates Check:</strong>
+                    <pre>${JSON.stringify(results, null, 2)}</pre>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Improved Search Functionality</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test Improved Search Functionality</h1>
+    
+    <div class="test-section">
+        <h2>API Response Format Test</h2>
+        <button onclick="testAPIResponse()">Test API Response Format</button>
+        <div id="api-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Tour Name Search Test</h2>
+        <button onclick="testTourNameSearch('Đà Lạt')">Test "Đà Lạt" Search</button>
+        <button onclick="testTourNameSearch('Sapa')">Test "Sapa" Search</button>
+        <button onclick="testTourNameSearch('Hạ Long')">Test "Hạ Long" Search</button>
+        <div id="tour-name-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Field Detection Test</h2>
+        <button onclick="testFieldDetection()">Test Tour Object Field Structure</button>
+        <div id="field-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Search with Console Logs</h2>
+        <p>Open browser console (F12) to see detailed search logs</p>
+        <button onclick="testSearchWithLogs('Đà Lạt')">Search "Đà Lạt" with Full Logs</button>
+        <div id="search-logs-result" class="result"></div>
+    </div>
+
+    <script>
+        async function testAPIResponse() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = '<p>Testing API response format...</p>';
+            
+            try {
+                console.log('🌐 Making API call to: http://localhost:5000/api/tours');
+                const response = await fetch('http://localhost:5000/api/tours');
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('📋 Raw API Response:', data);
+                
+                let tours = [];
+                let format = '';
+                
+                if (data.success && Array.isArray(data.data)) {
+                    tours = data.data;
+                    format = 'Wrapped format: {success: true, data: [...]}';
+                } else if (Array.isArray(data)) {
+                    tours = data;
+                    format = 'Direct array format: [...]';
+                } else {
+                    format = 'Unknown format';
+                }
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ API Response Test Results:</div>
+                    <p><strong>Format:</strong> ${format}</p>
+                    <p><strong>Tours Count:</strong> ${tours.length}</p>
+                    <p><strong>Sample Fields:</strong> ${tours.length > 0 ? Object.keys(tours[0]).join(', ') : 'No tours found'}</p>
+                    ${tours.length > 0 ? `<p><strong>Sample Tour:</strong> ${JSON.stringify(tours[0], null, 2)}</p>` : ''}
+                `;
+                
+            } catch (error) {
+                console.error('❌ API test failed:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testTourNameSearch(searchTerm) {
+            const resultDiv = document.getElementById('tour-name-result');
+            resultDiv.innerHTML = `<p>Searching for "${searchTerm}"...</p>`;
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/tours');
+                const data = await response.json();
+                
+                let tours = [];
+                if (data.success && Array.isArray(data.data)) {
+                    tours = data.data;
+                } else if (Array.isArray(data)) {
+                    tours = data;
+                }
+                
+                console.log(`🔍 Searching for tourName: "${searchTerm}"`);
+                console.log(`📊 Total tours available: ${tours.length}`);
+                
+                const matches = tours.filter(tour => {
+                    if (!tour || typeof tour !== 'object') {
+                        console.warn('⚠️ Invalid tour object:', tour);
+                        return false;
+                    }
+                    
+                    const nameFields = [tour.name, tour.tourName, tour.title].filter(Boolean);
+                    const locationFields = [tour.location, tour.destination].filter(Boolean);
+                    
+                    const nameMatch = nameFields.some(field => 
+                        field.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    const locationMatch = locationFields.some(field => 
+                        field.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    
+                    if (nameMatch || locationMatch) {
+                        console.log(`✅ Match found:`, {
+                            id: tour.id,
+                            name: tour.name,
+                            location: tour.location,
+                            destination: tour.destination
+                        });
+                    }
+                    
+                    return nameMatch || locationMatch;
+                });
+                
+                console.log(`🎯 Found ${matches.length} matches for "${searchTerm}"`);
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ Search Results for "${searchTerm}":</div>
+                    <p><strong>Total Tours:</strong> ${tours.length}</p>
+                    <p><strong>Matches Found:</strong> ${matches.length}</p>
+                    <div><strong>Matching Tours:</strong></div>
+                    ${matches.map(tour => `
+                        <div style="margin: 5px 0; padding: 5px; border: 1px solid #ddd;">
+                            <strong>${tour.name || tour.tourName || 'No name'}</strong><br>
+                            Location: ${tour.location || 'N/A'}<br>
+                            Destination: ${tour.destination || 'N/A'}
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                console.error('❌ Search test failed:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testFieldDetection() {
+            const resultDiv = document.getElementById('field-result');
+            resultDiv.innerHTML = '<p>Testing tour object field structure...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/tours');
+                const data = await response.json();
+                
+                let tours = [];
+                if (data.success && Array.isArray(data.data)) {
+                    tours = data.data;
+                } else if (Array.isArray(data)) {
+                    tours = data;
+                }
+                
+                if (tours.length === 0) {
+                    resultDiv.innerHTML = '<div class="warning">⚠️ No tours found to analyze</div>';
+                    return;
+                }
+                
+                // Analyze field structure across all tours
+                const fieldAnalysis = {};
+                tours.forEach((tour, index) => {
+                    if (tour && typeof tour === 'object') {
+                        Object.keys(tour).forEach(field => {
+                            if (!fieldAnalysis[field]) {
+                                fieldAnalysis[field] = { count: 0, samples: [] };
+                            }
+                            fieldAnalysis[field].count++;
+                            if (fieldAnalysis[field].samples.length < 3) {
+                                fieldAnalysis[field].samples.push(tour[field]);
+                            }
+                        });
+                    }
+                });
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ Field Analysis Results:</div>
+                    <p><strong>Total Tours Analyzed:</strong> ${tours.length}</p>
+                    <table border="1" style="border-collapse: collapse; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Field Name</th>
+                                <th>Count</th>
+                                <th>Sample Values</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(fieldAnalysis)
+                                .sort(([,a], [,b]) => b.count - a.count)
+                                .map(([field, info]) => `
+                                    <tr>
+                                        <td><strong>${field}</strong></td>
+                                        <td>${info.count}/${tours.length}</td>
+                                        <td>${info.samples.map(s => 
+                                            typeof s === 'string' ? `"${s.substring(0, 30)}${s.length > 30 ? '...' : ''}"` : 
+                                            JSON.stringify(s)
+                                        ).join(', ')}</td>
+                                    </tr>
+                                `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+            } catch (error) {
+                console.error('❌ Field detection failed:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testSearchWithLogs(searchTerm) {
+            const resultDiv = document.getElementById('search-logs-result');
+            resultDiv.innerHTML = `<p>Running detailed search test for "${searchTerm}" - check console for logs...</p>`;
+            
+            console.group(`🔍 Detailed Search Test: "${searchTerm}"`);
+            
+            try {
+                console.log('🌐 Making API call to: http://localhost:5000/api/tours');
+                const response = await fetch('http://localhost:5000/api/tours');
+                console.log('📡 API Response status:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+                
+                const toursData = await response.json();
+                console.log('📋 Raw API Response:', toursData);
+                console.log('📋 API Response type:', typeof toursData);
+                console.log('📋 API Response keys:', Object.keys(toursData || {}));
+                
+                // Handle different response formats
+                let tours = [];
+                if (toursData.success && Array.isArray(toursData.data)) {
+                    tours = toursData.data;
+                    console.log(`📊 Total tours fetched from data.data: ${tours.length}`);
+                } else if (Array.isArray(toursData)) {
+                    tours = toursData;
+                    console.log(`📊 Total tours fetched as array: ${tours.length}`);
+                } else {
+                    console.error('❌ Unexpected API response format:', toursData);
+                    tours = [];
+                }
+                
+                if (tours.length > 0) {
+                    console.log('📋 Sample tour structure:', tours[0]);
+                    console.log('📋 Sample tour fields:', Object.keys(tours[0]));
+                } else {
+                    console.warn('⚠️ No tours found in API response');
+                }
+                
+                // Filter by search term
+                console.log(`🔍 Searching for: "${searchTerm}"`);
+                const beforeFilter = tours.length;
+                
+                const filteredTours = tours.filter(tour => {
+                    if (!tour || typeof tour !== 'object') {
+                        console.warn('⚠️ Invalid tour object:', tour);
+                        return false;
+                    }
+                    
+                    const nameFields = [tour.name, tour.tourName, tour.title].filter(Boolean);
+                    const locationFields = [tour.location, tour.destination].filter(Boolean);
+                    
+                    const nameMatch = nameFields.some(field => 
+                        field.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    const locationMatch = locationFields.some(field => 
+                        field.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    
+                    if (nameMatch || locationMatch) {
+                        console.log(`✅ Match found in tour:`, {
+                            id: tour.id,
+                            name: tour.name,
+                            location: tour.location,
+                            destination: tour.destination,
+                            nameFields,
+                            locationFields
+                        });
+                    }
+                    
+                    return nameMatch || locationMatch;
+                });
+                
+                console.log(`🎯 After filter: ${filteredTours.length} tours (was ${beforeFilter})`);
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ Detailed Search Complete</div>
+                    <p>Check browser console for full logs</p>
+                    <p><strong>Result:</strong> ${filteredTours.length} matches found out of ${beforeFilter} total tours</p>
+                `;
+                
+            } catch (error) {
+                console.error('❌ Detailed search test failed:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            console.groupEnd();
+        }
+    </script>
+</body>
+</html>

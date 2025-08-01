@@ -27,14 +27,93 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
   useEffect(() => {
     if (!mounted) return; // Only run after component is mounted
     
-    // Lấy orderId từ URL parameters
-    const orderId = searchParams.get('orderId');
-    
-    if (!orderId) {
-      console.warn('No orderId found in URL parameters, using fallback mock data');
+    // Kiểm tra searchParams không null trước khi sử dụng
+    if (!searchParams) {
+      console.warn('⚠️ searchParams is null, using fallback mock data');
+      // Sử dụng mock data khi không có searchParams
+      const mockBookingData = {
+        id: "mock-booking-id-001",
+        status: "confirmed",
+        original_price: "10400000.00",
+        discount_amount: "1040000.00",
+        total_price: "9360000",
+        promotion_id: "promo-summer-2025",
+        booking_date: new Date().toISOString(),
+        number_of_adults: 2,
+        number_of_children: 0,
+        tour: {
+          name: "Tour khám phá Đà Nẵng - Hội An 4N3Đ",
+          location: "Đà Nẵng",
+          departure_location: "Hồ Chí Minh",
+          images: [{
+            image_url: "https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg",
+            is_main: true
+          }]
+        },
+        user: {
+          name: "Guest User",
+          email: "guest@tour.com"
+        },
+        payment: {
+          payment_method: "VNPay",
+          status: "completed",
+          amount: "9360000",
+          order_id: "MOCK_ORDER_" + Date.now()
+        },
+        guests: [{
+          name: "Nguyen Van A",
+          email: "guest@tour.com",
+          phone: "0123456789",
+          cccd: "089303002985"
+        }],
+        departureDate: {
+          departure_date: "2025-09-05",
+          end_date: "2025-09-08"
+        }
+      };
       
-      // Fallback với mock data khi không có orderId
-      const amount = searchParams.get('amount') || '9360000';
+      setBookingData(mockBookingData);
+      setBookingNumber("mock-booking-id-001");
+      setPaymentCompleted(true);
+      return;
+    }
+    
+    // Lấy orderId và bookingId từ URL parameters
+    const orderId = searchParams.get('orderId');
+    const bookingId = searchParams.get('bookingId');
+    const method = searchParams.get('method');
+    const vnpResponseCode = searchParams.get('vnp_ResponseCode');
+    const vnpTransactionStatus = searchParams.get('vnp_TransactionStatus');
+    
+    console.log('🔍 Confirmation Debug Info:', {
+      currentUrl: typeof window !== 'undefined' ? window.location.href : 'SSR',
+      orderId: orderId,
+      bookingId: bookingId,
+      method: method,
+      vnpResponseCode: vnpResponseCode,
+      vnpTransactionStatus: vnpTransactionStatus,
+      searchParams: searchParams ? searchParams.toString() : 'null',
+      allParams: searchParams ? Object.fromEntries(searchParams.entries()) : {}
+    });
+    
+    // Kiểm tra trạng thái VNPay payment
+    if (method === 'VNPay' || method === 'vnpay') {
+      console.log('🏦 VNPay Payment Detected:', {
+        responseCode: vnpResponseCode,
+        transactionStatus: vnpTransactionStatus,
+        isSuccess: vnpResponseCode === '00' && vnpTransactionStatus === '00'
+      });
+    }
+    
+    // Sử dụng orderId hoặc bookingId, ưu tiên orderId
+    const targetOrderId = orderId || bookingId;
+    
+    if (!targetOrderId) {
+      console.warn('⚠️ No orderId or bookingId found in URL parameters, using fallback mock data');
+      console.log('Available URL params:', searchParams ? Object.fromEntries(searchParams.entries()) : 'searchParams is null');
+      
+      // Fallback với mock data khi không có orderId/bookingId
+      const amount = searchParams ? searchParams.get('amount') || '9360000' : '9360000';
       const mockBookingData = {
         id: "mock-booking-id-001",
         status: "confirmed",
@@ -59,8 +138,8 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
           email: "guest@tour.com"
         },
         payment: {
-          payment_method: "MoMo",
-          status: "completed",
+          payment_method: method || "VNPay",
+          status: (method === 'VNPay' && vnpResponseCode === '00') ? "completed" : "pending",
           amount: amount,
           order_id: "MOCK_ORDER_" + Date.now()
         },
@@ -85,8 +164,9 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
     // Fetch payment data từ API endpoint - thử nhiều endpoint
     const tryFetchPaymentData = async () => {
       try {
-        // Thử endpoint by-order trước
-        const response = await fetch(`http://localhost:5000/api/payments/by-order/${orderId}`);
+        // Thử endpoint by-order trước với targetOrderId
+        console.log(`🔄 Trying API call with orderId: ${targetOrderId}`);
+        const response = await fetch(`http://localhost:5000/api/payments/by-order/${targetOrderId}`);
         console.log('API Response status:', response.status);
         
         if (response.ok) {
@@ -107,9 +187,14 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
             const allPaymentsData = await allPaymentsResponse.json();
             console.log('All payments data:', allPaymentsData);
             
-            // Tìm payment với orderId
+            // Tìm payment với orderId hoặc bookingId
             const payments = allPaymentsData.data || allPaymentsData || [];
-            const targetPayment = payments.find((p: any) => p.order_id === orderId);
+            const targetPayment = payments.find((p: any) => 
+              p.order_id === targetOrderId || 
+              p.order_id === orderId || 
+              p.order_id === bookingId ||
+              (p.booking && (p.booking.id === bookingId || p.booking.id === orderId))
+            );
             
             if (targetPayment) {
               console.log('Found payment by filtering:', targetPayment);
@@ -159,7 +244,7 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
         const departureDate = booking.departureDate;
         const promotion = booking.promotion;
 
-        // Combine all data từ API response
+        // Combine all data từ API response với thông tin từ URL
         const combinedData = {
           id: booking.id,
           status: booking.status || "confirmed",
@@ -181,10 +266,12 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
             email: user.email
           },
           payment: {
-            payment_method: paymentData.payment_method,
-            status: paymentData.status,
+            payment_method: paymentData.payment_method || method || 'VNPay',
+            status: paymentData.status || ((method === 'VNPay' && vnpResponseCode === '00') ? 'completed' : 'pending'),
             amount: paymentData.amount,
-            order_id: paymentData.order_id
+            order_id: paymentData.order_id || targetOrderId,
+            vnp_response_code: vnpResponseCode,
+            vnp_transaction_status: vnpTransactionStatus
           },
           guests: guests,
           departureDate: {
@@ -204,9 +291,9 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
         console.log('Using fallback mock data due to API error');
         
         // Fallback với mock data dựa trên URL params
-        const amount = searchParams.get('amount') || '9360000';
+        const amount = searchParams ? searchParams.get('amount') || '9360000' : '9360000';
         const mockBookingData = {
-          id: "01b075eb-c3e1-4611-9d9c-3a4b227f6d9d",
+          id: bookingId || orderId || "01b075eb-c3e1-4611-9d9c-3a4b227f6d9d",
           status: "confirmed",
           original_price: "10400000.00",
           discount_amount: "1040000.00",
@@ -229,10 +316,12 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
             email: "guest@tour.com"
           },
           payment: {
-            payment_method: "MoMo",
-            status: "pending",
+            payment_method: method || "VNPay",
+            status: (method === 'VNPay' && vnpResponseCode === '00') ? "completed" : "pending",
             amount: amount,
-            order_id: orderId
+            order_id: targetOrderId,
+            vnp_response_code: vnpResponseCode,
+            vnp_transaction_status: vnpTransactionStatus
           },
           guests: [{
             name: "Nguyen Van A",
@@ -247,7 +336,7 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
         };
         
         setBookingData(mockBookingData);
-        setBookingNumber("01b075eb-c3e1-4611-9d9c-3a4b227f6d9d");
+        setBookingNumber(bookingId || orderId || "01b075eb-c3e1-4611-9d9c-3a4b227f6d9d");
         setPaymentCompleted(true);
       });
   }, [searchParams, mounted]);
@@ -256,10 +345,14 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-teal-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang khởi tạo...</p>
-        </div>
+        <Card>
+          <CardContent>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-teal-500 mx-auto mb-4"></div>
+              <p className="text-gray-600">Đang khởi tạo...</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -276,13 +369,22 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
   }
 
   // Extract data từ API response
+
   const bookingInfo = bookingData || {};
   const paymentInfo = bookingData?.payment || {};
   const tourInfo = bookingData?.tour || {};
   const userInfo = bookingData?.user || {}; 
   const departureInfo = bookingData?.departureDate || null;
   const guestsInfo = bookingData?.guests || []; 
-  
+
+  // Lấy tên agency từ tourInfo.agency?.name hoặc tourInfo.agency_name
+  let agencyName = "";
+  if (tourInfo?.agency && tourInfo.agency.name) {
+    agencyName = tourInfo.agency.name;
+  } else if (tourInfo?.agency_name) {
+    agencyName = tourInfo.agency_name;
+  }
+
   const displayAmount = paymentInfo.amount ? Number(paymentInfo.amount) : 
                        (bookingInfo.total_price ? Number(bookingInfo.total_price) : 0);
 
@@ -314,6 +416,12 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
     finalTourImage: tourImage
   });
 
+  // Debug component để kiểm tra URL parameters
+  const URLParamsDebug = () => {
+    if (process.env.NODE_ENV !== 'development') return null;
+  
+  };
+
   // Debug component để kiểm tra hình ảnh
   const ImageDebug = () => (
     <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 text-xs">
@@ -326,6 +434,9 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 space-y-8">
+        {/* URL Parameters Debug (chỉ hiện trong development) */}
+        <URLParamsDebug />
+
         {/* Header thành công */}
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
@@ -441,10 +552,15 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
                   />
                 </div>
               </div>
-              
               {/* Thông tin chi tiết bên phải */}
               <div className="flex-1">
                 <h3 className="font-semibold text-base mb-2">{tourInfo.name}</h3>
+                {/* Hiển thị tên agency nếu có */}
+                {agencyName && (
+                  <div className="text-sm text-gray-500 mb-1">
+                    Đơn vị tổ chức: <span className="font-semibold text-teal-700">{agencyName}</span>
+                  </div>
+                )}
                 <div className="space-y-1 text-sm text-gray-600">
                   <div className="flex items-center">
                     <MapPin className="w-3 h-3 mr-1" />
@@ -558,6 +674,21 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
                   paymentInfo.status || "Không xác định"
                 }</span>
               </div>
+              
+              {/* Hiển thị thông tin VNPay nếu có */}
+              {(paymentInfo.vnp_response_code || paymentInfo.vnp_transaction_status) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Thông tin VNPay:</p>
+                    {paymentInfo.vnp_response_code && (
+                      <p>Mã phản hồi: {paymentInfo.vnp_response_code} {paymentInfo.vnp_response_code === '00' ? '(Thành công)' : '(Có lỗi)'}</p>
+                    )}
+                    {paymentInfo.vnp_transaction_status && (
+                      <p>Trạng thái giao dịch: {paymentInfo.vnp_transaction_status} {paymentInfo.vnp_transaction_status === '00' ? '(Thành công)' : '(Có lỗi)'}</p>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Trạng thái booking</span>
                 <span className={`font-medium ${
@@ -592,6 +723,7 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
           <CardContent className="p-6">
             <h3 className="font-semibold text-yellow-800 mb-4">Lưu ý quan trọng</h3>
             <ul className="list-disc pl-5 space-y-2 text-sm text-yellow-800">
+
               <li>Vui lòng có mặt tại điểm tập trung trước giờ khởi hành 30 phút.</li>
               <li>Mang theo giấy tờ tùy thân (CMND/CCCD/Hộ chiếu) khi tham gia tour.</li>
               <li>Vé điện tử này là bằng chứng xác nhận đặt tour của bạn.</li>
@@ -600,25 +732,51 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
             </ul>
           </CardContent>
         </Card>
-
-        {/* Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button
-            onClick={() => router.push('/')}
-            variant="outline"
-            className="bg-white hover:bg-gray-50"
-          >
-            <Home className="w-4 h-4 mr-2" />
-            Về trang chủ
-          </Button>
-          <Button
-            onClick={() => router.back()}
-            className="bg-teal-500 hover:bg-teal-600 text-white"
-          >
-            Quay lại trang tour
-          </Button>
+          
+          <div className="flex flex-row gap-4 mt-6 justify-center">
+            {/* Nút hủy tour - chỉ hiện với booking chưa hủy và chưa hoàn thành */}
+            {!["cancelled", "completed"].includes((bookingInfo?.status || '').toLowerCase()) && (
+              <Button
+                className="flex items-center gap-2 px-8 py-3 border border-red-300 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition"
+                onClick={() => {
+                  // Điều hướng sang trang hủy tour để xác nhận
+                  router.push(`/cancel-tour/${bookingInfo.id}`);
+                }}
+              >
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Hủy tour
+              </Button>
+            )}
+            <Button
+              className="flex items-center gap-2 px-8 py-3 border border-gray-300 rounded-lg bg-white text-gray-800 hover:bg-gray-100 transition"
+              onClick={() => router.push("/")}
+            >
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6" /></svg>
+              Về trang chủ
+            </Button>
+            <Button
+              className="px-8 py-3 rounded-lg bg-teal-500 text-white font-semibold hover:bg-teal-600 transition"
+              onClick={() => {
+                // Lấy tourId chính xác từ bookingData
+                let tourId = null;
+                if (bookingData?.tour && typeof bookingData.tour === 'object') {
+                  tourId = bookingData.tour.id || bookingData.tour._id;
+                }
+                if (!tourId) tourId = bookingData?.tour_id;
+                if (!tourId && tourInfo?.id) tourId = tourInfo.id;
+                if (tourId) {
+                  router.push(`/tour/${tourId}`);
+                } else {
+                  router.push("/");
+                }
+              }}
+            >
+              Quay lại trang tour
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
   )
 }

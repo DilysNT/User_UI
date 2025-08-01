@@ -25,11 +25,11 @@ export default function Footer() {
             </div>
             {/* Menu center */}
             <div className="flex flex-row items-center justify-center gap-10 flex-1">
-              <span className="text-gray-300 text-base font-medium">Về chúng tôi</span>
-              <span className="text-gray-300 text-base font-medium">Dịch vụ</span>
-              <span className="text-gray-300 text-base font-medium">Hỗ trợ</span>
-              <span className="text-gray-300 text-base font-medium">Liên hệ</span>
-              <span className="text-gray-300 text-base font-medium">Điều khoản</span>
+              <Link href="/about" className="text-gray-300 text-base font-medium hover:text-white">Về chúng tôi</Link>
+              <Link href="/services" className="text-gray-300 text-base font-medium hover:text-white">Dịch vụ</Link>
+              <Link href="/support" className="text-gray-300 text-base font-medium hover:text-white">Hỗ trợ</Link>
+              <Link href="/policy" className="text-gray-300 text-base font-medium hover:text-white">Chính sách</Link>
+              <Link href="/terms" className="text-gray-300 text-base font-medium hover:text-white">Điều khoản</Link>
             </div>
             {/* Email subscribe right */}
             <div className="flex flex-col items-end min-w-[260px]">

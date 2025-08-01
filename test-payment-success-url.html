@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Payment Success URL Format</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px;
+        }
+        .url { 
+            background: #f5f5f5; 
+            padding: 10px; 
+            border-radius: 3px; 
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Payment Success URL Format</h1>
+    <p>Test if the payment-success page can handle the new backend redirect URL format.</p>
+
+    <div class="test-case">
+        <h3>📋 New Backend URL Format</h3>
+        <div class="url" id="newFormatUrl">
+            http://localhost:3000/payment-success?orderId=ORDER123&bookingId=BOOK456&method=VNPay&tourName=Ha%20Long%20Bay%20Tour
+        </div>
+        <button class="test-button" onclick="testNewFormat()">🚀 Test New Format</button>
+        <p><strong>Expected behavior:</strong> Should use existing booking (BOOK456) and update its status to confirmed.</p>
+    </div>
+
+    <div class="test-case">
+        <h3>🔄 Legacy VNPay Format</h3>
+        <div class="url" id="vnpayUrl">
+            http://localhost:3000/payment-success?vnp_TxnRef=ORDER123&vnp_ResponseCode=00&vnp_TransactionNo=VNP789&vnp_Amount=3150000000
+        </div>
+        <button class="test-button" onclick="testVNPay()">🚀 Test VNPay Format</button>
+        <p><strong>Expected behavior:</strong> Should create new booking from localStorage data.</p>
+    </div>
+
+    <div class="test-case">
+        <h3>💳 Legacy MoMo Format</h3>
+        <div class="url" id="momoUrl">
+            http://localhost:3000/payment-success?orderId=ORDER123&resultCode=0&transId=MOMO789
+        </div>
+        <button class="test-button" onclick="testMoMo()">🚀 Test MoMo Format</button>
+        <p><strong>Expected behavior:</strong> Should create new booking from localStorage data.</p>
+    </div>
+
+    <div class="test-case">
+        <h3>🔗 URL Parameters Summary</h3>
+        <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+            <thead>
+                <tr style="background: #f0f0f0;">
+                    <th>Parameter</th>
+                    <th>New Format</th>
+                    <th>VNPay Legacy</th>
+                    <th>MoMo Legacy</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>orderId</code></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>Supported</td>
+                </tr>
+                <tr>
+                    <td><code>bookingId</code></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅ Now Supported</td>
+                </tr>
+                <tr>
+                    <td><code>method</code></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅ Now Supported</td>
+                </tr>
+                <tr>
+                    <td><code>tourName</code></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅ Now Supported</td>
+                </tr>
+                <tr>
+                    <td><code>vnp_TxnRef</code></td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>Legacy Support</td>
+                </tr>
+                <tr>
+                    <td><code>vnp_ResponseCode</code></td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>Legacy Support</td>
+                </tr>
+                <tr>
+                    <td><code>resultCode</code></td>
+                    <td>❌</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                    <td>Legacy Support</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function testNewFormat() {
+            const url = document.getElementById('newFormatUrl').textContent.trim();
+            console.log('🧪 Testing new format URL:', url);
+            window.location.href = url;
+        }
+
+        function testVNPay() {
+            // Set up mock localStorage data for legacy test
+            const mockPaymentData = {
+                pendingBooking: {
+                    tour_id: 1,
+                    departure_date_id: 1,
+                    number_of_adults: 2,
+                    number_of_children: 1,
+                    guests: [{
+                        name: "Test User",
+                        email: "test@example.com",
+                        phone: "0123456789",
+                        cccd: "123456789012"
+                    }],
+                    total_price: 31500000
+                },
+                tour: {
+                    id: 1,
+                    name: "Ha Long Bay Tour",
+                    price: 15000000
+                },
+                authToken: null,
+                userInfo: null,
+                isUserLoggedIn: false
+            };
+            localStorage.setItem('paymentData', JSON.stringify(mockPaymentData));
+            
+            const url = document.getElementById('vnpayUrl').textContent.trim();
+            console.log('🧪 Testing VNPay format URL:', url);
+            window.location.href = url;
+        }
+
+        function testMoMo() {
+            // Set up mock localStorage data for legacy test
+            const mockPaymentData = {
+                pendingBooking: {
+                    tour_id: 1,
+                    departure_date_id: 1,
+                    number_of_adults: 2,
+                    number_of_children: 1,
+                    guests: [{
+                        name: "Test User",
+                        email: "test@example.com",
+                        phone: "0123456789",
+                        cccd: "123456789012"
+                    }],
+                    total_price: 31500000
+                },
+                tour: {
+                    id: 1,
+                    name: "Ha Long Bay Tour",
+                    price: 15000000
+                },
+                authToken: null,
+                userInfo: null,
+                isUserLoggedIn: false,
+                paymentMethod: "momo"
+            };
+            localStorage.setItem('paymentData', JSON.stringify(mockPaymentData));
+            
+            const url = document.getElementById('momoUrl').textContent.trim();
+            console.log('🧪 Testing MoMo format URL:', url);
+            window.location.href = url;
+        }
+
+        // Display current localStorage data
+        console.log('💾 Current localStorage keys:', Object.keys(localStorage));
+        console.log('📦 Current paymentData:', localStorage.getItem('paymentData'));
+    </script>
+</body>
+</html>

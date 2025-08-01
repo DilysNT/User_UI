@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover"
-import { MapPin, Calendar, Users, Search, Plus, Minus } from "lucide-react"
+
+import { MapPin, Calendar, Search } from "lucide-react"
+import PublicPromoCodes from "./public-promo-codes";
 
 export default function HeroSection() {
   const router = useRouter()
@@ -20,6 +21,9 @@ export default function HeroSection() {
   const [tourNames, setTourNames] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [today, setToday] = useState("")
+  const [departureDates, setDepartureDates] = useState<any[]>([]);
+  const [departureLocations, setDepartureLocations] = useState<string[]>([]);
+
   interface Location {
     id?: string
     _id?: string
@@ -27,15 +31,14 @@ export default function HeroSection() {
     [key: string]: any
   }
   const [locations, setLocations] = useState<Location[]>([])
-  const [departureLocations, setDepartureLocations] = useState<string[]>([])
 
   useEffect(() => {
     setToday(new Date().toISOString().split("T")[0])
+    
     // Fetch locations from API
     fetch("http://localhost:5000/api/locations")
       .then((res) => res.json())
       .then((data) => {
-        // Always set locations as an array
         if (Array.isArray(data)) {
           setLocations(data)
         } else if (data && Array.isArray(data.locations)) {
@@ -45,24 +48,34 @@ export default function HeroSection() {
         }
       })
       .catch(() => setLocations([]))
-    // Fetch departure locations and tour names from tours API
+
+    // Fetch departure locations from new API
+    fetch("http://localhost:5000/api/departure-locations/with-count")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          // Lấy tất cả departure_location từ data
+          const departures = data.data.map(item => item.departure_location).filter(Boolean)
+          setDepartureLocations(departures)
+        } else {
+          setDepartureLocations([])
+        }
+      })
+      .catch(() => setDepartureLocations([]))
+
+    // Fetch tour names from tours API
     fetch("http://localhost:5000/api/tours")
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          // Lấy tất cả departure_location, loại bỏ trùng lặp và null/undefined
-          const departures = Array.from(new Set(data.map(tour => tour.departure_location).filter(Boolean)))
-          setDepartureLocations(departures)
           // Lấy tất cả tên tour, loại bỏ trùng lặp và null/undefined
           const names = Array.from(new Set(data.map(tour => tour.name).filter(Boolean)))
           setTourNames(names)
         } else {
-          setDepartureLocations([])
           setTourNames([])
         }
       })
       .catch(() => {
-        setDepartureLocations([])
         setTourNames([])
       })
   }, [])
@@ -84,14 +97,29 @@ export default function HeroSection() {
     if (searchData.tourName.trim()) {
       // Gọi API lấy tất cả tour và lọc theo tên
       try {
+        // Gửi log tìm kiếm
+        try {
+          await fetch("http://localhost:5000/api/search/log", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              keyword: searchData.tourName.trim()
+            })
+          });
+        } catch (error) {
+          console.log("Không thể ghi log tìm kiếm:", error);
+          // Vẫn tiếp tục tìm kiếm dù log fail
+        }
+
         const res = await fetch("http://localhost:5000/api/tours")
         const tours = await res.json()
         // Lọc tour theo tên (không phân biệt hoa thường, loại bỏ khoảng trắng thừa)
         const filtered = Array.isArray(tours)
           ? tours.filter(tour => tour.name && tour.name.toLowerCase().includes(searchData.tourName.trim().toLowerCase()))
           : []
-        // Chuyển kết quả sang trang search, truyền danh sách tour qua query (hoặc localStorage nếu quá dài)
-        // Đơn giản: truyền tên tour qua query
+        // Chuyển kết quả sang trang search, truyền danh sách tour qua query
         router.push(`/search?tourName=${encodeURIComponent(searchData.tourName.trim())}`)
         return
       } catch {
@@ -99,6 +127,7 @@ export default function HeroSection() {
         return
       }
     }
+    
     // Nếu không nhập tên, dùng bộ lọc bên dưới
     if (!searchData.destination) {
       alert("Vui lòng chọn điểm đến")
@@ -108,6 +137,23 @@ export default function HeroSection() {
       alert("Vui lòng chọn điểm khởi hành")
       return
     }
+
+    // Gửi log tìm kiếm cho bộ lọc (sử dụng destination làm keyword)
+    try {
+      await fetch("http://localhost:5000/api/search/log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          keyword: searchData.destination
+        })
+      });
+    } catch (error) {
+      console.log("Không thể ghi log tìm kiếm:", error);
+      // Vẫn tiếp tục tìm kiếm dù log fail
+    }
+
     const searchParams = new URLSearchParams({
       destination: searchData.destination,
       departure: searchData.departure,
@@ -118,27 +164,27 @@ export default function HeroSection() {
   }
 
   return (
-    <section className="relative h-[90vh] flex flex-col justify-between items-center">
-      <video className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop>
-        <source src="/hero-video.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
-      <div className="relative z-10 w-full flex flex-col items-center mt-32">
-        <h1 className="text-4xl md:text-6xl font-bold text-white mb-7">
-          Cùng Tìm Kiếm Tour Tốt Nhất Cho Bạn
-        </h1>
-        <p
-          className="text-base md:text-lg text-white max-w-2xl text-center mb-0"
-          style={{ textShadow: '0 1px 8px #000' }}
-        >
-          Tạo trải nghiệm độc đáo và hấp dẫn hơn với các tour trọn gói của chúng tôi, cung cấp dịch vụ tuyệt vời và những kỷ niệm không thể quên.
-        </p>
-      </div>
-      <div className="relative z-10 w-full max-w-4xl mb-10">
-        <div className="bg-white border border-[#7BBCB0] rounded-2xl shadow-xl p-6 max-w-5xl mx-auto flex flex-col gap-4">
+    <>
+      <section className="relative h-[90vh] flex flex-col justify-between items-center">
+        <video className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop>
+          <source src="/home.mp4" type="video/mp4" />
+        </video>
+        <div className="relative z-10 w-full flex flex-col items-center mt-32">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-7">
+            Cùng Tìm Kiếm Tour Tốt Nhất Cho Bạn
+          </h1>
+          <p
+            className="text-base md:text-lg text-white max-w-2xl text-center mb-6"
+            style={{ textShadow: '0 1px 8px #000' }}
+          >
+            Tạo trải nghiệm độc đáo và hấp dẫn hơn với các tour trọn gói của chúng tôi, cung cấp dịch vụ tuyệt vời và những kỷ niệm không thể quên.
+          </p>
+        </div>
+        <div className="relative z-10 w-full max-w-4xl mb-10">
+          <div className="bg-white border border-[#7BBCB0] rounded-2xl shadow-xl p-6 max-w-5xl mx-auto flex flex-col gap-4">
             {/* Hàng 1: Tìm kiếm theo tên tour */}
             <div className="flex items-center gap-4 w-full">
-              <div className="flex-1 min-w-[200px] relative"> {/* Thêm relative ở đây */}
+              <div className="flex-1 min-w-[200px] relative">
                 <label className="text-[#7BBCB0] font-semibold text-sm flex items-center mb-2">
                   <Search className="w-4 h-4 mr-2" />
                   Tên tour
@@ -203,19 +249,47 @@ export default function HeroSection() {
                 </Select>
               </div>
 
-              {/* Ngày bắt đầu */}
+              {/* Ngày đi */}
               <div className="flex-1 min-w-[200px] border-l border-gray-300 pl-6">
                 <label className="text-[#7BBCB0] font-semibold text-sm flex items-center mb-2">
                   <Calendar className="w-4 h-4 mr-2" />
                   Ngày đi
+                  {departureDates.length > 0 && (
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({departureDates.length} ngày có sẵn)
+                    </span>
+                  )}
                 </label>
-                <Input
-                  type="date"
-                  value={searchData.startDate}
-                  onChange={(e) => setSearchData((prev) => ({ ...prev, startDate: e.target.value }))}
-                  className="border-0 p-0 h-auto focus-visible:ring-0 text-gray-700"
-                  min={today}
-                />
+
+                {departureDates.length > 0 ? (
+                  <Select
+                    value={searchData.startDate}
+                    onValueChange={(value) => setSearchData((prev) => ({ ...prev, startDate: value }))}
+                  >
+                    <SelectTrigger className={`select-trigger w-full border-0 p-0 h-auto focus:ring-0`}>
+                      <SelectValue placeholder="dd/mm/yyyy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departureDates.map((date) => {
+                        const formattedDate = new Date(date.departure_date).toLocaleDateString('vi-VN')
+                        const dayOfWeek = new Date(date.departure_date).toLocaleDateString('vi-VN', { weekday: 'long' })
+                        return (
+                          <SelectItem key={date.id} value={date.departure_date}>
+                            {formattedDate} ({dayOfWeek}) - {date.number_of_days}N{date.number_of_nights}Đ
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    type="date"
+                    value={searchData.startDate}
+                    onChange={(e) => setSearchData((prev) => ({ ...prev, startDate: e.target.value }))}
+                    className="border-0 p-0 h-auto focus-visible:ring-0 text-gray-700"
+                    min={today}
+                  />
+                )}
               </div>
 
               {/* Điểm khởi hành */}
@@ -224,6 +298,7 @@ export default function HeroSection() {
                   <MapPin className="w-4 h-4 mr-2" />
                   Điểm khởi hành
                 </label>
+
                 <Select
                   value={searchData.departure}
                   onValueChange={(value) => setSearchData((prev) => ({ ...prev, departure: value }))}
@@ -232,11 +307,15 @@ export default function HeroSection() {
                     <SelectValue placeholder="Chọn điểm khởi hành" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departureLocations.map((loc) => (
-                      <SelectItem key={loc} value={loc}>
-                        {loc}
-                      </SelectItem>
-                    ))}
+                    {departureLocations.length === 0 ? (
+                      <SelectItem value="loading" disabled>Đang tải...</SelectItem>
+                    ) : (
+                      departureLocations.map((loc) => (
+                        <SelectItem key={loc} value={loc}>
+                          {loc}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -253,7 +332,9 @@ export default function HeroSection() {
               </div>
             </div>
           </div>
-      </div>
-    </section>
+        </div>
+      </section>
+      {/* Xóa PublicPromoCodes khỏi HeroSection, sẽ render ở ngoài component này */}
+    </>
   )
 }

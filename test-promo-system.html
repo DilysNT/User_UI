@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Promo Code System Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .promo-card { border: 2px solid #10b981; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 12px; margin: 10px 0; }
+        .promo-code { font-size: 24px; font-weight: bold; letter-spacing: 2px; }
+        .scenario { background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 10px 0; }
+        .benefit { background: #f0fdf4; border: 1px solid #16a34a; padding: 10px; border-radius: 6px; margin: 5px 0; }
+        .flow-step { background: #fef3c7; border: 1px solid #f59e0b; padding: 12px; border-radius: 6px; margin: 8px 0; position: relative; }
+        .flow-step::before { content: "→"; position: absolute; left: -20px; color: #f59e0b; font-weight: bold; }
+        button { padding: 10px 20px; background: #0ea5e9; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0284c7; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .stat-card { background: #1f2937; color: white; padding: 15px; border-radius: 8px; text-align: center; }
+        .notification { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px; border-radius: 8px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎫 Hệ thống Mã giảm giá cho User</h1>
+        
+        <div class="section">
+            <h2>📋 Tổng quan hệ thống</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>4 Loại mã</h3>
+                    <p>Completion, Birthday, Loyalty, Referral</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Tự động tạo</h3>
+                    <p>Sau khi hoàn thành tour + review</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Giảm lên tới</h3>
+                    <p>25% cho khách VIP</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Hết hạn</h3>
+                    <p>30-180 ngày tùy loại</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Các cách User nhận mã giảm giá</h2>
+            
+            <div class="scenario">
+                <h3>1. 📝 Hoàn thành tour + Viết đánh giá</h3>
+                <div class="benefit">✅ Tự động nhận mã giảm 10% (tối đa 500k)</div>
+                <div class="benefit">✅ Có hiệu lực 90 ngày</div>
+                <div class="benefit">✅ Áp dụng cho đơn từ 1 triệu</div>
+                <div class="promo-card">
+                    <div class="promo-code" id="completion-code">TOUR12250721ABC</div>
+                    <div>Mã giảm giá cảm ơn sau khi hoàn thành tour</div>
+                </div>
+            </div>
+
+            <div class="scenario">
+                <h3>2. 🎂 Sinh nhật</h3>
+                <div class="benefit">🎉 Mã giảm sinh nhật 15% (tối đa 1 triệu)</div>
+                <div class="benefit">🎉 Có hiệu lực 30 ngày</div>
+                <div class="benefit">🎉 Áp dụng cho đơn từ 2 triệu</div>
+                <div class="promo-card">
+                    <div class="promo-code" id="birthday-code">BIRTH12250721XYZ</div>
+                    <div>Mã giảm giá sinh nhật đặc biệt 🎂</div>
+                </div>
+            </div>
+
+            <div class="scenario">
+                <h3>3. 🌟 Khách hàng thân thiết</h3>
+                <div class="benefit">⭐ 5+ tours: Mã VIP Vàng 20% (tối đa 2 triệu)</div>
+                <div class="benefit">💎 10+ tours: Mã VIP Kim Cương 25% (tối đa 2.5 triệu)</div>
+                <div class="benefit">⏰ Có hiệu lực 180 ngày</div>
+                <div class="promo-card">
+                    <div class="promo-code" id="loyalty-code">LOYAL12250721VIP</div>
+                    <div>Mã giảm giá khách hàng VIP Vàng 🥇</div>
+                </div>
+            </div>
+
+            <div class="scenario">
+                <h3>4. 👥 Giới thiệu bạn bè</h3>
+                <div class="benefit">🤝 Cả 2 bên đều được giảm giá</div>
+                <div class="benefit">🤝 Mã giảm đặc biệt cho người giới thiệu</div>
+                <div class="promo-card">
+                    <div class="promo-code" id="referral-code">REF12250721FRD</div>
+                    <div>Mã giảm giá giới thiệu bạn bè</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔄 Quy trình tự động tạo mã</h2>
+            <div class="flow-step">User hoàn thành tour (trạng thái: completed)</div>
+            <div class="flow-step">User viết đánh giá và gửi thành công</div>
+            <div class="flow-step">Hệ thống tự động tạo mã giảm 10%</div>
+            <div class="flow-step">Kiểm tra số tour đã hoàn thành</div>
+            <div class="flow-step">Tạo mã Loyalty nếu đủ điều kiện (mỗi 5 tours)</div>
+            <div class="flow-step">Hiển thị notification cho user</div>
+            <div class="flow-step">Mã được lưu vào tab "Mã giảm giá" trong profile</div>
+        </div>
+
+        <div class="section">
+            <h2>🎁 Demo Notification</h2>
+            <button onclick="showPromoNotification()">Hiển thị thông báo nhận mã</button>
+            <button onclick="generateNewCodes()">Tạo mã mới</button>
+            <button onclick="showUserPromoTab()">Xem tab mã giảm giá</button>
+            
+            <div id="notification-area"></div>
+        </div>
+
+        <div class="section">
+            <h2>💡 Benefits cho Business</h2>
+            <div class="benefit">📈 Tăng tỷ lệ khách hàng quay lại (retention)</div>
+            <div class="benefit">⭐ Khuyến khích khách viết đánh giá</div>
+            <div class="benefit">👥 Tăng khách hàng thân thiết</div>
+            <div class="benefit">💰 Tối ưu hóa doanh thu từ repeat customers</div>
+            <div class="benefit">📱 Tăng engagement trên platform</div>
+        </div>
+
+        <div class="section">
+            <h2>📊 User Interface Integration</h2>
+            <h3>Profile Modal có 3 tabs:</h3>
+            <div style="display: flex; gap: 10px; margin: 15px 0;">
+                <button style="background: #0d9488;">Thông tin cá nhân</button>
+                <button style="background: #0d9488;">Lịch sử đặt tour</button>
+                <button style="background: #10b981; transform: scale(1.05);">🎫 Mã giảm giá</button>
+            </div>
+            
+            <div style="border: 2px solid #10b981; border-radius: 8px; padding: 15px; background: #f0fdf4;">
+                <h4>Tab "Mã giảm giá" hiển thị:</h4>
+                <ul>
+                    <li>✅ Danh sách tất cả mã của user</li>
+                    <li>✅ Trạng thái: Có thể sử dụng / Đã dùng / Hết hạn</li>
+                    <li>✅ Thông tin chi tiết: % giảm, điều kiện, hết hạn</li>
+                    <li>✅ Button sao chép mã</li>
+                    <li>✅ Nguồn gốc mã (từ tour nào, sự kiện gì)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function generatePromoCode(type = 'completion') {
+            const prefixes = {
+                completion: 'TOUR',
+                birthday: 'BIRTH',
+                loyalty: 'LOYAL',
+                referral: 'REF'
+            };
+            
+            const prefix = prefixes[type];
+            const userSuffix = Math.floor(Math.random() * 99).toString().padStart(2, '0');
+            const dateSuffix = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+            const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+            
+            return `${prefix}${userSuffix}${dateSuffix}${random}`;
+        }
+
+        function showPromoNotification() {
+            const code = generatePromoCode('completion');
+            const notificationArea = document.getElementById('notification-area');
+            
+            notificationArea.innerHTML = `
+                <div class="notification" style="animation: slideInRight 0.5s ease-out;">
+                    <div style="display: flex; justify-content: between; align-items: center;">
+                        <div>
+                            <h3>🎉 Chúc mừng! Bạn nhận được mã giảm giá mới</h3>
+                            <div style="font-size: 20px; font-weight: bold; margin: 10px 0; letter-spacing: 2px;">${code}</div>
+                            <p>Mã giảm giá cảm ơn sau khi hoàn thành tour - Giảm 10% cho lần đặt tiếp theo</p>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.style.display='none'" style="background: rgba(255,255,255,0.2);">✕</button>
+                    </div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                notificationArea.innerHTML = '';
+            }, 5000);
+        }
+
+        function generateNewCodes() {
+            document.getElementById('completion-code').textContent = generatePromoCode('completion');
+            document.getElementById('birthday-code').textContent = generatePromoCode('birthday');
+            document.getElementById('loyalty-code').textContent = generatePromoCode('loyalty');
+            document.getElementById('referral-code').textContent = generatePromoCode('referral');
+        }
+
+        function showUserPromoTab() {
+            alert(`
+🎫 Tab "Mã giảm giá" trong Profile sẽ hiển thị:
+
+📋 Danh sách mã của user:
+• ${generatePromoCode('completion')} - Có thể sử dụng (Giảm 10%)
+• ${generatePromoCode('loyalty')} - Có thể sử dụng (Giảm 20%)
+• SUMMER2025ABC - Đã sử dụng
+• BIRTHDAY2024XYZ - Hết hạn
+
+✨ Mỗi mã có:
+• Trạng thái rõ ràng
+• Thông tin giảm giá
+• Điều kiện áp dụng
+• Ngày hết hạn
+• Button sao chép
+• Nguồn gốc (từ tour nào)
+            `);
+        }
+
+        // Auto generate new codes every 10 seconds for demo
+        setInterval(generateNewCodes, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test New Booking Summary API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .result { 
+            background: #e8f5e8; 
+            border: 2px solid #4caf50; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .error { background: #ffe8e8; border-color: #f44336; color: #d32f2f; }
+        input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin: 5px; width: 300px; }
+        button { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .sql-box { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧮 Test New Booking Summary Algorithm</h1>
+        <p>Thuật toán mới theo đề xuất: <code>SUM(number_of_adults + number_of_children) WHERE status='confirmed'</code></p>
+        
+        <div>
+            <label>Tour ID:</label><br>
+            <input type="text" id="tourId" value="2231a82b-6b08-4835-8a33-b7e6e031b430" placeholder="Tour ID">
+        </div>
+        
+        <div>
+            <label>Departure Date ID:</label><br>
+            <input type="text" id="departureDateId" value="979846c0-1c5d-4dc9-84fd-866eb9d7d11b" placeholder="Departure Date ID">
+        </div>
+        
+        <button onclick="testNewAlgorithm()">🧮 Test New Algorithm</button>
+        <button onclick="compareWithOld()">⚖️ Compare Old vs New</button>
+        
+        <div class="sql-box">
+            <h3>📝 SQL Query tương đương:</h3>
+            <code id="sqlQuery">
+SELECT 
+    tour_id,
+    departure_date_id,
+    SUM(number_of_adults + number_of_children) AS total_confirmed_people
+FROM booking 
+WHERE status = 'confirmed' 
+  AND tour_id = '[TOUR_ID]'
+  AND departure_date_id = '[DEPARTURE_DATE_ID]'
+GROUP BY tour_id, departure_date_id;
+            </code>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function updateSQLQuery() {
+            const tourId = document.getElementById('tourId').value;
+            const departureDateId = document.getElementById('departureDateId').value;
+            const sqlElement = document.getElementById('sqlQuery');
+            
+            sqlElement.textContent = `
+SELECT 
+    tour_id,
+    departure_date_id,
+    SUM(number_of_adults + number_of_children) AS total_confirmed_people
+FROM booking 
+WHERE status = 'confirmed' 
+  AND tour_id = '${tourId}'
+  AND departure_date_id = '${departureDateId}'
+GROUP BY tour_id, departure_date_id;
+            `.trim();
+        }
+
+        async function testNewAlgorithm() {
+            const tourId = document.getElementById('tourId').value;
+            const departureDateId = document.getElementById('departureDateId').value;
+            const resultDiv = document.getElementById('result');
+            
+            updateSQLQuery();
+            
+            if (!tourId || !departureDateId) {
+                alert('Vui lòng nhập đầy đủ Tour ID và Departure Date ID');
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div style="text-align: center; padding: 20px;">🔄 Testing new algorithm (like your sample code)...</div>';
+            
+            try {
+                // Step 1: Get tour max_participants
+                resultDiv.innerHTML = '<div>📊 Step 1: Getting tour max_participants...</div>';
+                const tourResponse = await fetch(`http://localhost:5000/api/tours/${tourId}/complete`);
+                const tourData = await tourResponse.json();
+                const maxParticipants = tourData.max_participants || 0;
+                
+                // Step 2: Get ALL confirmed bookings (like your sample code)
+                resultDiv.innerHTML += '<div>📋 Step 2: Getting ALL confirmed bookings...</div>';
+                const allBookingsUrl = `http://localhost:5000/api/bookings?status=confirmed`;
+                const allBookingsResponse = await fetch(allBookingsUrl);
+                const allBookingsData = await allBookingsResponse.json();
+                const allBookings = Array.isArray(allBookingsData) ? allBookingsData : (allBookingsData.bookings || []);
+                
+                // Step 3: Group by tour_id + departure_date_id (like your sample code)
+                resultDiv.innerHTML += '<div>🧮 Step 3: Grouping by tour_id + departure_date_id...</div>';
+                
+                const confirmedCounts = {};
+                let detailsLog = '';
+                
+                allBookings.forEach((booking) => {
+                    if (booking.status === 'confirmed') {
+                        const bookingTourId = booking.tour_id;
+                        const bookingDepartureDateId = booking.departure_date_id;
+                        const count = (booking.number_of_adults || 0) + (booking.number_of_children || 0);
+                        
+                        // Create unique key for tour + departure date combination
+                        const key = `${bookingTourId}|${bookingDepartureDateId}`;
+                        
+                        if (confirmedCounts[key]) {
+                            confirmedCounts[key] += count;
+                        } else {
+                            confirmedCounts[key] = count;
+                        }
+                        
+                        detailsLog += `• ${booking.id.substring(0,8)}... Tour: ${bookingTourId.substring(0,8)}..., Date: ${bookingDepartureDateId.substring(0,8)}..., Guests: ${count}\n`;
+                    }
+                });
+                
+                // Step 4: Get count for current tour + departure date
+                const currentKey = `${tourId}|${departureDateId}`;
+                const totalConfirmedGuests = confirmedCounts[currentKey] || 0;
+                
+                // Step 5: Calculate available slots
+                const availableSlots = Math.max(0, maxParticipants - totalConfirmedGuests);
+                
+                resultDiv.innerHTML = `
+<div class="result">
+🧮 NEW ALGORITHM RESULTS (Code mẫu của bạn)
+
+📊 TOUR INFO:
+• Tour ID: ${tourId}
+• Tour Name: ${tourData.name}
+• Max Participants: ${maxParticipants}
+
+📋 BOOKING PROCESSING:
+• Total confirmed bookings found: ${allBookings.filter(b => b.status === 'confirmed').length}
+• Algorithm: Group all confirmed bookings by tour_id + departure_date_id
+
+🗂️ GROUPED COUNTS:
+${Object.entries(confirmedCounts).map(([key, count]) => `• ${key}: ${count} guests`).join('\n')}
+
+🎯 CURRENT TOUR+DATE:
+• Key: ${currentKey}
+• Total Confirmed Guests: ${totalConfirmedGuests}
+
+🧮 CALCULATION:
+• Available Slots = ${maxParticipants} - ${totalConfirmedGuests} = ${availableSlots}
+
+🎯 RESULT: ${availableSlots} CHỖ TRỐNG
+
+📝 ALGORITHM EQUIVALENT:
+1. Fetch ALL confirmed bookings
+2. Group by tour_id + departure_date_id 
+3. Sum (adults + children) for each group
+4. Get count for specific tour+date
+5. Calculate: max_participants - confirmed_count
+
+${availableSlots === 0 ? '⚠️ TOUR FULL - NO AVAILABLE SLOTS' : '✅ SLOTS AVAILABLE'}
+
+📋 SAMPLE PROCESSING LOG:
+${detailsLog.split('\n').slice(0, 10).join('\n')}
+${allBookings.filter(b => b.status === 'confirmed').length > 10 ? '...(more bookings)' : ''}
+</div>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function compareWithOld() {
+            const tourId = document.getElementById('tourId').value;
+            const departureDateId = document.getElementById('departureDateId').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = '<div style="text-align: center; padding: 20px;">⚖️ Comparing algorithms...</div>';
+            
+            try {
+                // Get tour data
+                const tourResponse = await fetch(`http://localhost:5000/api/tours/${tourId}/complete`);
+                const tourData = await tourResponse.json();
+                const maxParticipants = tourData.max_participants || 0;
+                
+                // Get all confirmed bookings
+                const bookingsResponse = await fetch(`http://localhost:5000/api/bookings?tour_id=${tourId}&departure_date_id=${departureDateId}&status=confirmed`);
+                const bookingsData = await bookingsResponse.json();
+                const bookings = Array.isArray(bookingsData) ? bookingsData : (bookingsData.bookings || []);
+                
+                // OLD Algorithm (current): Count each booking individually
+                let oldTotal = 0;
+                let bookingDetails = '';
+                bookings.forEach((booking, index) => {
+                    const adults = booking.number_of_adults || 0;
+                    const children = booking.number_of_children || 0;
+                    const guests = adults + children;
+                    oldTotal += guests;
+                    
+                    bookingDetails += `${index + 1}. ${adults}A + ${children}C = ${guests} guests\n`;
+                });
+                
+                // NEW Algorithm: SUM(adults + children)
+                const newTotal = bookings.reduce((total, booking) => {
+                    return total + (booking.number_of_adults || 0) + (booking.number_of_children || 0);
+                }, 0);
+                
+                const oldAvailable = Math.max(0, maxParticipants - oldTotal);
+                const newAvailable = Math.max(0, maxParticipants - newTotal);
+                
+                resultDiv.innerHTML = `
+<div class="result">
+⚖️ ALGORITHM COMPARISON
+
+📊 TOUR DATA:
+• Max Participants: ${maxParticipants}
+• Total Confirmed Bookings: ${bookings.length}
+
+🔄 OLD ALGORITHM (Current):
+• Method: Individual booking iteration
+• Total Guests: ${oldTotal}
+• Available Slots: ${oldAvailable}
+
+🆕 NEW ALGORITHM (Proposed):
+• Method: SUM(adults + children) aggregation
+• Total Guests: ${newTotal}
+• Available Slots: ${newAvailable}
+
+📋 BOOKING DETAILS:
+${bookingDetails}
+
+🎯 COMPARISON RESULT:
+${oldTotal === newTotal ? '✅ SAME RESULT - Both algorithms produce identical results' : '❌ DIFFERENT RESULT - Algorithms produce different results!'}
+
+💡 CONCLUSION:
+${oldTotal === newTotal ? 
+  'The current algorithm is already working correctly. The issue may be elsewhere.' : 
+  'There is a discrepancy between the algorithms. Investigation needed.'
+}
+</div>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Auto-update SQL query when inputs change
+        document.getElementById('tourId').addEventListener('input', updateSQLQuery);
+        document.getElementById('departureDateId').addEventListener('input', updateSQLQuery);
+        
+        // Initialize
+        updateSQLQuery();
+    </script>
+</body>
+</html>

@@ -2,6 +2,8 @@ import BookingHistory from "./BookingHistory";
 import { useState, useEffect } from "react";
 import ReviewModal from "./ReviewModal";
 import { useToast } from "../ui/use-toast";
+import NotificationDialog from "../ui/NotificationDialog";
+import { useNotificationDialog } from "../../hooks/useNotificationDialog";
 
 interface BookingItem {
   id: string;
@@ -30,6 +32,15 @@ export default function ProfileModal({ open, onClose }) {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [initialReview, setInitialReview] = useState<any>(null);
   const { toast } = useToast();
+  const {
+    notification,
+    hideNotification,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+    showConfirmation,
+  } = useNotificationDialog();
 
   useEffect(() => {
     if (!open) return;
@@ -54,11 +65,16 @@ export default function ProfileModal({ open, onClose }) {
       .then(async data => {
         // Lấy đúng mảng bookings từ API
         const bookingsArr = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
-        // Lấy tất cả tour_id duy nhất
-        const tourIds = [...new Set(bookingsArr.map((b: any) => b.tour_id))];
-        // Fetch chi tiết tour cho từng tour_id
+        
+        // Lấy tất cả tour_id cần fetch (chỉ những cái chưa có tour object và tour_id không null)
+        const tourIdsToFetch = [...new Set(bookingsArr
+          .filter((b: any) => b.tour_id !== null && !b.tour)
+          .map((b: any) => b.tour_id)
+        )];
+        
+        // Fetch chi tiết tour cho từng tour_id cần thiết
         const tourMap: { [key: string]: any } = {};
-        await Promise.all(tourIds.map(async (tourId: any) => {
+        await Promise.all(tourIdsToFetch.map(async (tourId: any) => {
           try {
             const res = await fetch(`http://localhost:5000/api/tours/${tourId}`);
             if (res.ok) {
@@ -67,25 +83,49 @@ export default function ProfileModal({ open, onClose }) {
             }
           } catch {}
         }));
+        
+        // Lấy tất cả tour_id (bao gồm cả những cái đã có tour object)
+        const allTourIds = [...new Set(bookingsArr
+          .filter((b: any) => b.tour_id !== null)
+          .map((b: any) => b.tour_id)
+        )];
+        
         // Fetch tất cả review của user cho các tour đã đặt
-        const reviewPromises = tourIds.map(tourId =>
+        const reviewPromises = allTourIds.map(tourId =>
           fetch(`http://localhost:5000/api/reviews/tour/${tourId}`).then(res => res.json())
         );
         const reviewResults = await Promise.all(reviewPromises);
         const allReviews = reviewResults.flatMap(r => r.data || []);
+        
         // Map review và thông tin tour vào từng booking
         const mapped = bookingsArr.map((b: any) => {
           const review = allReviews.find(
             (r: any) => r.booking_id === b.id && r.user_id === user.id
           );
-          const tour = tourMap[b.tour_id] || {};
+          
+          // Ưu tiên tour object có sẵn, nếu không thì lấy từ tourMap đã fetch
+          const tour = b.tour || tourMap[b.tour_id] || {};
+          
           return {
             id: b.id,
-            tour_name: tour.name || "",
-            departure_date: b.booking_date ? new Date(b.booking_date).toLocaleDateString("vi-VN") : "",
+            tour_name: tour.name || "Thông tin tour không có sẵn",
+            departure_date: b.departureDate?.departure_date || 
+                           (b.booking_date ? new Date(b.booking_date).toLocaleDateString("vi-VN") : "Chưa xác định"),
             status: b.status || "",
             review: review || null,
-            tour_id: b.tour_id
+            tour_id: b.tour_id,
+            // Thêm các thông tin chi tiết
+            booking_date: b.booking_date,
+            original_price: b.original_price,
+            discount_amount: b.discount_amount,
+            total_price: b.total_price,
+            number_of_adults: b.number_of_adults,
+            number_of_children: b.number_of_children,
+            commission_rate: b.commission_rate,
+            admin_commission: b.admin_commission,
+            agency_amount: b.agency_amount,
+            departureDate: b.departureDate,
+            promotion: b.promotion
           };
         });
         setBookings(mapped);
@@ -110,13 +150,13 @@ export default function ProfileModal({ open, onClose }) {
 
   const handleSave = async () => {
     if (!form.currentPassword) {
-      alert("Vui lòng nhập mật khẩu hiện tại để xác nhận thay đổi!");
+      showError("Lỗi xác thực", "Vui lòng nhập mật khẩu hiện tại để xác nhận thay đổi!");
       return;
     }
     
     // Validate new password if provided
     if (form.newPassword && form.newPassword.trim() !== "" && form.newPassword.length < 6) {
-      alert("Mật khẩu mới phải có ít nhất 6 ký tự!");
+      showError("Lỗi mật khẩu", "Mật khẩu mới phải có ít nhất 6 ký tự!");
       return;
     }
     
@@ -149,19 +189,19 @@ export default function ProfileModal({ open, onClose }) {
       console.log("Response data:", data); // Debug log
       
       if (res.status === 401) {
-        alert("Mật khẩu hiện tại không đúng!");
+        showError("Lỗi xác thực", "Mật khẩu hiện tại không đúng!");
         setLoading(false);
         return;
       }
 
       if (res.status === 400) {
-        alert(data.message || "Dữ liệu không hợp lệ!");
+        showError("Lỗi dữ liệu", data.message || "Dữ liệu không hợp lệ!");
         setLoading(false);
         return;
       }
 
       if (!res.ok) {
-        alert(data.message || "Cập nhật thất bại!");
+        showError("Lỗi cập nhật", data.message || "Cập nhật thất bại!");
         setLoading(false);
         return;
       }
@@ -173,9 +213,9 @@ export default function ProfileModal({ open, onClose }) {
       
       // Show success message based on what was updated
       if (form.newPassword && form.newPassword.trim() !== "") {
-        alert("Cập nhật thông tin và mật khẩu thành công!");
+        showSuccess("Thành công", "Cập nhật thông tin và mật khẩu thành công!");
       } else {
-        alert("Cập nhật thông tin thành công!");
+        showSuccess("Thành công", "Cập nhật thông tin thành công!");
       }
       
       setLoading(false);
@@ -191,7 +231,7 @@ export default function ProfileModal({ open, onClose }) {
       
     } catch (error) {
       console.error("Update error:", error);
-      alert("Lỗi kết nối máy chủ!");
+      showError("Lỗi kết nối", "Lỗi kết nối máy chủ!");
       setLoading(false);
     }
   };
@@ -200,6 +240,63 @@ export default function ProfileModal({ open, onClose }) {
     localStorage.removeItem("token");
     localStorage.removeItem("user"); 
     window.location.reload();
+  };
+
+  const handleCancelBooking = async (booking: any) => {
+    showConfirmation(
+      "Xác nhận hủy tour",
+      `Bạn có chắc chắn muốn hủy tour "${booking.tour_name}"?\n\nLưu ý: Việc hủy tour có thể phát sinh phí hủy theo chính sách của chúng tôi.`,
+      async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const response = await fetch(`http://localhost:5000/api/bookings/${booking.id}/cancel`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          const data = await response.json();
+      
+          if (response.ok) {
+            showSuccess("Hủy tour thành công", "Tour của bạn đã được hủy. Chúng tôi sẽ liên hệ với bạn về việc hoàn tiền.");
+            // Reload bookings list
+            window.location.reload();
+          } else {
+            showError("Hủy tour thất bại", data.message || "Không thể hủy tour. Vui lòng thử lại sau.");
+          }
+        } catch (error) {
+          console.error('Cancel booking error:', error);
+          showError("Lỗi hệ thống", "Không thể hủy tour. Vui lòng thử lại sau.");
+        }
+      },
+      "Hủy tour",
+      "Quay lại"
+    );
+  };
+
+  const handleCancelClick = (booking: any) => {
+    // Mở trang hủy tour trong tab mới
+    window.open(`/cancel-tour/${booking.id}`, '_blank');
+  };
+
+  const handleViewDetails = (booking: any) => {
+    console.log('📋 Opening booking details for:', booking);
+    
+    // Chuyển hướng đến trang confirmation với thông tin booking
+    const params = new URLSearchParams({
+      bookingId: booking.id,
+      orderId: booking.id, // Sử dụng booking.id làm orderId
+      method: 'BookingReview', // Đánh dấu đây là xem lại từ history
+      fromHistory: 'true', // Flag để biết đây là từ history
+      amount: booking.total_price || '0'
+    });
+    
+    console.log('🔗 Confirmation URL:', `/confirmation?${params.toString()}`);
+    
+    // Mở trang confirmation trong tab mới
+    window.open(`/confirmation?${params.toString()}`, '_blank');
   };
 
   const handleReview = (action: string, booking: any) => {
@@ -224,50 +321,58 @@ export default function ProfileModal({ open, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex flex-col justify-center items-center min-h-screen z-[10000]">
-      <div className="bg-white rounded-lg p-8 w-full max-w-4xl max-h-[90vh] relative flex flex-col">
-        <button className="absolute top-2 right-2 text-gray-500" onClick={onClose}>✕</button>
-        <div className="flex flex-col md:flex-row">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex flex-col justify-center items-center min-h-screen z-[10000] p-4">
+      <div className="bg-white rounded-2xl p-10 w-full max-w-6xl max-h-[95vh] relative flex flex-col shadow-2xl">
+        <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors duration-200 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100" onClick={onClose}>
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar */}
-          <div className="w-full md:w-1/3 pr-0 md:pr-6 border-b md:border-b-0 md:border-r mb-4 md:mb-0 flex flex-col items-center">
-            <div className="flex flex-col items-center mb-4">
-              <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white shadow bg-gray-100 flex items-center justify-center">
+          <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r border-gray-200 pb-6 lg:pb-0 lg:pr-8 flex flex-col items-center">
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gray-100 flex items-center justify-center">
                 <img src={user.avatar ? user.avatar : "/user.png"} alt={user.username || "User"} className="w-full h-full object-cover" />
               </div>
-              <div className="font-semibold mt-2 text-center w-full truncate" title={user.name || getNameFromEmail(user.email)}>
+              <div className="font-semibold text-lg mt-4 text-center w-full truncate" title={user.name || getNameFromEmail(user.email)}>
                 {user.name || getNameFromEmail(user.email)}
               </div>
-              <div className="text-gray-500 text-sm text-center w-full truncate" title={user.email}>{user.email}</div>
+              <div className="text-gray-500 text-base text-center w-full truncate" title={user.email}>{user.email}</div>
             </div>
-            <div className="flex flex-row md:flex-col gap-2 w-full justify-center md:justify-start">
-              <button className={`text-center px-4 py-2 rounded font-semibold transition-colors duration-150 w-full ${tab === "profile" ? "bg-teal-500 text-white" : "bg-white text-teal-700 hover:bg-teal-100"}`} onClick={() => setTab("profile")}>Thông tin cá nhân</button>
-              <button className={`text-center px-4 py-2 rounded font-semibold transition-colors duration-150 w-full ${tab === "history" ? "bg-teal-500 text-white" : "bg-white text-teal-700 hover:bg-teal-100"}`} onClick={() => setTab("history")}>Lịch sử đặt tour</button>
+            <div className="flex flex-row lg:flex-col gap-3 w-full justify-center lg:justify-start">
+              <button className={`text-center px-6 py-3 rounded-xl font-semibold transition-all duration-200 w-full text-base ${tab === "profile" ? "bg-teal-500 text-white shadow-md" : "bg-white text-teal-700 hover:bg-teal-50 border border-teal-200"}`} onClick={() => setTab("profile")}>
+                Thông tin cá nhân
+              </button>
+              <button className={`text-center px-6 py-3 rounded-xl font-semibold transition-all duration-200 w-full text-base ${tab === "history" ? "bg-teal-500 text-white shadow-md" : "bg-white text-teal-700 hover:bg-teal-50 border border-teal-200"}`} onClick={() => setTab("history")}>
+                Lịch sử đặt tour
+              </button>
             </div>
           </div>
           {/* Main content */}
-          <div className="w-full md:w-2/3 md:pl-6 min-h-[28rem] overflow-y-auto" style={{ maxHeight: "60vh" }}>
+          <div className="w-full lg:w-2/3 min-h-[32rem] overflow-y-auto" style={{ maxHeight: "70vh" }}>
             {tab === "profile" && user && (
               <div>
-                <h2 className="text-xl font-semibold mb-4">Thông tin cá nhân</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <h2 className="text-2xl font-semibold mb-6 text-gray-800">Thông tin cá nhân</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Tên đăng nhập:</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tên đăng nhập:</label>
                     {editMode ? (
-                      <input name="name" className="w-full border rounded px-3 py-4 text-base text-black break-all" value={form.name} onChange={handleChange} style={{minHeight: '48px'}} />
+                      <input name="name" className="w-full border-2 border-gray-200 rounded-xl px-4 py-4 text-base text-black focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200" value={form.name} onChange={handleChange} style={{minHeight: '52px'}} />
                     ) : (
-                      <div className="px-3 py-2 border rounded bg-gray-50 text-black">{user.name || getNameFromEmail(user.email)}</div>
+                      <div className="px-4 py-4 border-2 border-gray-200 rounded-xl bg-gray-50 text-black text-base" style={{minHeight: '52px'}}>{user.name || getNameFromEmail(user.email)}</div>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Email:</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email:</label>
                     {editMode ? (
-                      <textarea name="email" rows={2} className="w-full border rounded px-3 py-4 text-base text-black break-all resize-none" value={form.email} onChange={e => handleChange({ target: { name: 'email', value: e.target.value } } as any)} style={{minHeight: '48px'}} />
+                      <textarea name="email" rows={2} className="w-full border-2 border-gray-200 rounded-xl px-4 py-4 text-base text-black resize-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200" value={form.email} onChange={e => handleChange({ target: { name: 'email', value: e.target.value } } as any)} style={{minHeight: '52px'}} />
                     ) : (
-                      <div className="px-3 py-2 border rounded bg-gray-50 text-black break-all whitespace-pre-line">{user.email}</div>
+                      <div className="px-4 py-4 border-2 border-gray-200 rounded-xl bg-gray-50 text-black text-base whitespace-pre-line" style={{minHeight: '52px'}}>{user.email}</div>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Mật khẩu mới:
                       <span className="text-gray-400 font-normal"> (để trống nếu không thay đổi)</span>
                     </label>
@@ -275,55 +380,55 @@ export default function ProfileModal({ open, onClose }) {
                       <input 
                         name="newPassword" 
                         type="password" 
-                        className="w-full border rounded px-3 py-4 text-base text-black break-all" 
+                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-4 text-base text-black focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200" 
                         value={form.newPassword} 
                         onChange={handleChange} 
                         placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)" 
-                        style={{minHeight: '48px'}}
+                        style={{minHeight: '52px'}}
                         minLength={6}
                       />
                     ) : (
-                      <div className="px-3 py-2 border rounded bg-gray-50 italic text-gray-400">••••••••</div>
+                      <div className="px-4 py-4 border-2 border-gray-200 rounded-xl bg-gray-50 italic text-gray-400 text-base" style={{minHeight: '52px'}}>••••••••</div>
                     )}
                   </div>
                   {editMode && (
-                    <div className="md:col-span-2">
-                      <label className="block text-sm text-gray-600 mb-1">
+                    <div className="lg:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Mật khẩu hiện tại <span className="text-red-500">*</span>
                         <span className="text-gray-400 font-normal"> (bắt buộc để xác nhận thay đổi)</span>
                       </label>
                       <input 
                         name="currentPassword" 
                         type="password" 
-                        className="w-full border rounded px-3 py-4 text-base text-black break-all" 
+                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-4 text-base text-black focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200" 
                         value={form.currentPassword} 
                         onChange={handleChange} 
                         placeholder="Nhập mật khẩu hiện tại để xác nhận" 
                         required 
-                        style={{minHeight: '48px'}} 
+                        style={{minHeight: '52px'}} 
                       />
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 justify-start md:justify-start lg:justify-start flex-wrap">
+                <div className="flex gap-4 justify-start flex-wrap">
                   {editMode ? (
                     <>
                       <button
-                        className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-6 py-2 rounded transition-colors duration-150"
+                        className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-8 py-3 rounded-xl transition-all duration-200 hover:shadow-lg"
                         onClick={handleSave}
                         disabled={loading}
                       >
                         {loading ? "Đang lưu..." : "Lưu"}
                       </button>
                       <button
-                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-6 py-2 rounded transition-colors duration-150"
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-8 py-3 rounded-xl transition-all duration-200 hover:shadow-md"
                         onClick={() => { setEditMode(false); setForm({ name: user.name || "", email: user.email || "", newPassword: "", currentPassword: "" }); }}
                         disabled={loading}
                       >
                         Hủy
                       </button>
                       <button
-                        className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-6 py-2 rounded transition-colors duration-150 ml-auto"
+                        className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-8 py-3 rounded-xl transition-all duration-200 hover:shadow-md ml-auto"
                         onClick={handleLogout}
                         type="button"
                       >
@@ -333,13 +438,13 @@ export default function ProfileModal({ open, onClose }) {
                   ) : (
                     <>
                       <button
-                        className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-6 py-2 rounded transition-colors duration-150"
+                        className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-8 py-3 rounded-xl transition-all duration-200 hover:shadow-lg"
                         onClick={() => setEditMode(true)}
                       >
                         Sửa
                       </button>
                       <button
-                        className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-6 py-2 rounded transition-colors duration-150 ml-2"
+                        className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-8 py-3 rounded-xl transition-all duration-200 hover:shadow-md ml-4"
                         onClick={handleLogout}
                         type="button"
                       >
@@ -351,7 +456,13 @@ export default function ProfileModal({ open, onClose }) {
               </div>
             )}
             {tab === "history" && (
-              <BookingHistory bookings={bookings} onReview={handleReview} />
+              <BookingHistory 
+                bookings={bookings} 
+                onReview={handleReview} 
+                onViewDetails={handleViewDetails} 
+                onCancelBooking={handleCancelBooking}
+                onCancelClick={handleCancelClick}
+              />
             )}
           </div>
         </div>
@@ -378,9 +489,9 @@ export default function ProfileModal({ open, onClose }) {
             });
             const data = await res.json();
             if (!res.ok || data.success === false) {
-              alert(data.message || "Gửi đánh giá thất bại!");
+              showError("Gửi đánh giá thất bại", data.message || "Có lỗi xảy ra khi gửi đánh giá!");
             } else {
-              alert("Đánh giá thành công! Cảm ơn bạn đã đánh giá tour.");
+              showSuccess("Đánh giá thành công", "Cảm ơn bạn đã đánh giá tour!");
             }
             // Reload bookings
             if (user?.id) {
@@ -388,9 +499,15 @@ export default function ProfileModal({ open, onClose }) {
                 .then(res => res.json())
                 .then(async data => {
                   const bookingsArr = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
-                  const tourIds = [...new Set(bookingsArr.map((b: any) => b.tour_id))];
+                  
+                  // Lấy tất cả tour_id cần fetch (chỉ những cái chưa có tour object và tour_id không null)
+                  const tourIdsToFetch = [...new Set(bookingsArr
+                    .filter((b: any) => b.tour_id !== null && !b.tour)
+                    .map((b: any) => b.tour_id)
+                  )];
+                  
                   const tourMap: { [key: string]: any } = {};
-                  await Promise.all(tourIds.map(async (tourId: any) => {
+                  await Promise.all(tourIdsToFetch.map(async (tourId: any) => {
                     try {
                       const res = await fetch(`http://localhost:5000/api/tours/${tourId}`);
                       if (res.ok) {
@@ -399,7 +516,14 @@ export default function ProfileModal({ open, onClose }) {
                       }
                     } catch {}
                   }));
-                  const reviewPromises = tourIds.map(tourId =>
+                  
+                  // Lấy tất cả tour_id (bao gồm cả những cái đã có tour object)
+                  const allTourIds = [...new Set(bookingsArr
+                    .filter((b: any) => b.tour_id !== null)
+                    .map((b: any) => b.tour_id)
+                  )];
+                  
+                  const reviewPromises = allTourIds.map(tourId =>
                     fetch(`http://localhost:5000/api/reviews/tour/${tourId}`).then(res => res.json())
                   );
                   const reviewResults = await Promise.all(reviewPromises);
@@ -408,26 +532,52 @@ export default function ProfileModal({ open, onClose }) {
                     const review = allReviews.find(
                       (r: any) => r.booking_id === b.id && r.user_id === user.id
                     );
-                    const tour = tourMap[b.tour_id] || {};
+                    // Ưu tiên tour object có sẵn, nếu không thì lấy từ tourMap đã fetch
+                    const tour = b.tour || tourMap[b.tour_id] || {};
                     return {
                       id: b.id,
-                      tour_name: tour.name || "",
-                      departure_date: b.booking_date ? new Date(b.booking_date).toLocaleDateString("vi-VN") : "",
+                      tour_name: tour.name || "Thông tin tour không có sẵn",
+                      departure_date: b.departureDate?.departure_date || 
+                                     (b.booking_date ? new Date(b.booking_date).toLocaleDateString("vi-VN") : "Chưa xác định"),
                       status: b.status || "",
                       review: review || null,
-                      tour_id: b.tour_id
+                      tour_id: b.tour_id,
+                      // Thêm các thông tin chi tiết
+                      booking_date: b.booking_date,
+                      original_price: b.original_price,
+                      discount_amount: b.discount_amount,
+                      total_price: b.total_price,
+                      number_of_adults: b.number_of_adults,
+                      number_of_children: b.number_of_children,
+                      commission_rate: b.commission_rate,
+                      admin_commission: b.admin_commission,
+                      agency_amount: b.agency_amount,
+                      departureDate: b.departureDate,
+                      promotion: b.promotion
                     };
                   });
                   setBookings(mapped);
                 });
             }
           } catch (e) {
-            alert("Gửi đánh giá thất bại!");
+            showError("Gửi đánh giá thất bại", "Có lỗi xảy ra khi gửi đánh giá!");
           }
           setReviewModalOpen(false);
         }}
         booking={selectedBooking}
         initialReview={initialReview}
+      />
+      
+      <NotificationDialog
+        isOpen={notification.isOpen}
+        onClose={hideNotification}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        confirmText={notification.confirmText}
+        cancelText={notification.cancelText}
+        onConfirm={notification.onConfirm}
+        showCancel={notification.showCancel}
       />
     </div>
   );

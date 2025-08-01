@@ -204,6 +204,7 @@ export const debugPromotionResponse = (response: any, originalPrice: number): vo
 
 /**
  * Tính toán booking data theo logic backend mới
+ * Trẻ em chỉ trả 50% giá tour
  */
 export const calculateBookingData = (
   tourPrice: number, 
@@ -212,8 +213,12 @@ export const calculateBookingData = (
   finalPrice?: number | null,
   discountAmount?: number
 ) => {
-  // Backend logic: original_price = tour.price * (adults + children)
-  const original_price = tourPrice * (adults + children);
+  // Backend logic mới: 
+  // - Người lớn: tour.price * adults
+  // - Trẻ em: tour.price * 0.5 * children
+  const adultPrice = tourPrice * adults;
+  const childPrice = tourPrice * 0.5 * children;
+  const original_price = adultPrice + childPrice;
   
   // Nếu có finalPrice thì dùng, không thì dùng original_price - discountAmount
   const total_price = finalPrice !== null && finalPrice !== undefined 
@@ -223,7 +228,7 @@ export const calculateBookingData = (
   // Backend sẽ tự tính: discount_amount = original_price - total_price
   const calculated_discount = original_price - total_price;
   
-  console.group('📊 Booking Calculation');
+  console.group('📊 Booking Calculation (Children 50% Price)');
   console.log('Input params:', {
     tourPrice: formatVND(tourPrice),
     adults,
@@ -231,6 +236,12 @@ export const calculateBookingData = (
     totalPeople: adults + children,
     finalPrice: finalPrice !== null ? formatVND(finalPrice || 0) : 'null',
     discountAmount: formatVND(discountAmount || 0)
+  });
+  console.log('Price breakdown:', {
+    adultPrice: formatVND(adultPrice),
+    childPrice: formatVND(childPrice),
+    childPricePerPerson: formatVND(tourPrice * 0.5),
+    childDiscount: '50%'
   });
   console.log('Calculated values:', {
     original_price: formatVND(original_price),
@@ -243,7 +254,9 @@ export const calculateBookingData = (
   return {
     original_price,
     total_price,
-    calculated_discount
+    calculated_discount,
+    adultPrice,
+    childPrice
   };
 };
 

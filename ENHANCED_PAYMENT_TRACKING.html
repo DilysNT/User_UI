@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Enhanced Payment Flow với Booking Status Tracking</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .flow-section { background: white; border-radius: 12px; padding: 24px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .step { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; position: relative; }
+        .step.success { border-color: #10b981; background: #f0fdf4; }
+        .step.danger { border-color: #ef4444; background: #fef2f2; }
+        .step.warning { border-color: #f59e0b; background: #fffbeb; }
+        .step.info { border-color: #3b82f6; background: #eff6ff; }
+        .step-number { position: absolute; top: -10px; left: 16px; background: #3b82f6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+        .step.success .step-number { background: #10b981; }
+        .step.danger .step-number { background: #ef4444; }
+        .step.warning .step-number { background: #f59e0b; }
+        .code-block { background: #1f2937; color: #f9fafb; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; overflow-x: auto; margin: 12px 0; }
+        .highlight { background: #fef3c7; padding: 2px 4px; border-radius: 4px; font-weight: bold; }
+        .api-endpoint { background: #dbeafe; padding: 8px 12px; border-radius: 6px; font-family: monospace; margin: 8px 0; }
+        .success-box { background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .error-box { background: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .info-box { background: #dbeafe; border: 1px solid #3b82f6; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-confirmed { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #dc2626; }
+        .status-cancelled { background: #f3f4f6; color: #374151; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Enhanced Payment Flow - Booking Status Tracking</h1>
+        
+        <div class="flow-section">
+            <h2>📋 Yêu cầu đã implement:</h2>
+            <div class="success-box">
+                <h3>✅ User Behavior Tracking:</h3>
+                <ul>
+                    <li><strong>Payment Failed:</strong> Tạo booking với status <span class="status-badge status-failed">"failed"</span></li>
+                    <li><strong>User Cancel:</strong> Tạo booking với status <span class="status-badge status-cancelled">"cancelled"</span></li>
+                    <li><strong>Payment Success:</strong> Update "failed" → <span class="status-badge status-confirmed">"confirmed"</span> hoặc tạo mới</li>
+                    <li><strong>Retry Payment:</strong> Reuse existing failed booking thay vì tạo duplicate</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="flow-section">
+            <h2>🔄 Enhanced Flow Scenarios:</h2>
+            
+            <div class="step success">
+                <div class="step-number">1</div>
+                <h3>💰 Payment Success (Existing Logic)</h3>
+                <p><strong>Outcome:</strong> Booking với status <span class="status-badge status-confirmed">"confirmed"</span></p>
+                <div class="code-block">
+// Booking.tsx → Payment.tsx → PaymentSuccess.tsx
+const bookingPayload = {
+  ...pendingBooking,
+  status: 'confirmed',
+  payment_status: 'paid',
+  payment_reference: paymentResult.orderId
+};
+</div>
+            </div>
+
+            <div class="step danger">
+                <div class="step-number">2</div>
+                <h3>❌ Payment Failed (NEW - Track Behavior)</h3>
+                <p><strong>Outcome:</strong> Booking với status <span class="status-badge status-failed">"failed"</span> để track conversion</p>
+                <div class="api-endpoint">POST /api/bookings với status: "failed"</div>
+                <div class="code-block">
+// PaymentFailed.tsx - createFailedBooking()
+const failedBookingPayload = {
+  ...paymentData.pendingBooking,
+  status: 'failed', // Track failed attempt
+  payment_status: 'failed',
+  payment_method: 'vnpay',
+  failure_reason: 'Payment failed - Code: 01',
+  failed_at: new Date().toISOString()
+};
+
+// Save failed booking ID for retry
+localStorage.setItem("failedBookingId", failedBooking.id);
+</div>
+            </div>
+
+            <div class="step warning">
+                <div class="step-number">3</div>
+                <h3>🔄 Payment Retry (NEW - Reuse Booking)</h3>
+                <p><strong>Outcome:</strong> Update existing failed booking thay vì tạo duplicate</p>
+                <div class="api-endpoint">PUT /api/bookings/{id} - Update failed → confirmed</div>
+                <div class="code-block">
+// Payment.tsx - createBookingAfterPayment()
+if (retryBookingId) {
+  // Update existing failed booking
+  const updatePayload = {
+    status: 'confirmed',
+    payment_status: 'paid',
+    payment_reference: paymentResult.orderId,
+    confirmed_at: new Date().toISOString()
+  };
+  
+  await fetch(`/api/bookings/${retryBookingId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updatePayload)
+  });
+}
+</div>
+            </div>
+
+            <div class="step info">
+                <div class="step-number">4</div>
+                <h3>🚫 User Cancel (NEW - Track Behavior)</h3>
+                <p><strong>Outcome:</strong> Booking với status <span class="status-badge status-cancelled">"cancelled"</span> để track abandonment</p>
+                <div class="api-endpoint">POST /api/bookings với status: "cancelled"</div>
+                <div class="code-block">
+// Payment.tsx - handleCancelBooking()
+const cancelledBookingPayload = {
+  ...pendingBooking,
+  status: 'cancelled',
+  payment_status: 'cancelled',
+  cancelled_at: new Date().toISOString(),
+  cancel_reason: 'User cancelled payment'
+};
+
+// Track cancellation behavior
+await fetch('/api/bookings', {
+  method: 'POST',
+  body: JSON.stringify(cancelledBookingPayload)
+});
+</div>
+            </div>
+        </div>
+
+        <div class="flow-section">
+            <h2>📊 Business Analytics Benefits:</h2>
+            
+            <div class="info-box">
+                <h3>🎯 Conversion Tracking:</h3>
+                <ul>
+                    <li><strong>Total Attempts:</strong> confirmed + failed + cancelled</li>
+                    <li><strong>Success Rate:</strong> confirmed / total_attempts</li>
+                    <li><strong>Abandonment Rate:</strong> cancelled / total_attempts</li>
+                    <li><strong>Payment Failure Rate:</strong> failed / total_attempts</li>
+                    <li><strong>Retry Success Rate:</strong> (retry_confirmed / failed_attempts)</li>
+                </ul>
+            </div>
+            
+            <div class="code-block">
+-- SQL Analytics Examples
+SELECT 
+  status,
+  COUNT(*) as count,
+  COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() as percentage
+FROM bookings 
+WHERE created_at >= '2024-01-01'
+GROUP BY status;
+
+-- Retry Analysis
+SELECT 
+  tour_id,
+  COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_attempts,
+  COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as successful_bookings,
+  COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_attempts
+FROM bookings 
+GROUP BY tour_id
+ORDER BY failed_attempts DESC;
+</div>
+        </div>
+
+        <div class="flow-section">
+            <h2>🛠️ Technical Implementation:</h2>
+            
+            <h3>📁 Files Modified:</h3>
+            
+            <div class="step">
+                <h4>1. app/payment-failed/page.tsx</h4>
+                <ul>
+                    <li>✅ <strong>Added:</strong> createFailedBooking() function</li>
+                    <li>✅ <strong>Added:</strong> Track failure_reason và failed_at</li>
+                    <li>✅ <strong>Added:</strong> Save failedBookingId for retry</li>
+                    <li>✅ <strong>Updated:</strong> handleRetry() to include retryBookingId</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <h4>2. components/details/Payment.tsx</h4>
+                <ul>
+                    <li>✅ <strong>Added:</strong> handleCancelBooking() function</li>
+                    <li>✅ <strong>Updated:</strong> createBookingAfterPayment() để handle retry</li>
+                    <li>✅ <strong>Added:</strong> Retry logic với PUT request</li>
+                    <li>✅ <strong>Added:</strong> "Hủy đặt tour" button</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="flow-section">
+            <h2>🎮 User Experience Flows:</h2>
+            
+            <div class="step success">
+                <h3>✅ Happy Path: Payment Success</h3>
+                <ol>
+                    <li>User điền form booking → Save pendingBooking</li>
+                    <li>User chọn payment method → Redirect to gateway</li>
+                    <li>User hoàn tất thanh toán → Gateway return success</li>
+                    <li>PaymentSuccess tạo booking với status "confirmed"</li>
+                    <li>User nhận email confirmation</li>
+                </ol>
+            </div>
+            
+            <div class="step danger">
+                <h3>❌ Payment Failed Scenario</h3>
+                <ol>
+                    <li>User điền form booking → Save pendingBooking</li>
+                    <li>User chọn payment method → Redirect to gateway</li>
+                    <li>Payment thất bại (insufficient funds, network error, etc.)</li>
+                    <li>PaymentFailed tạo booking với status "failed"</li>
+                    <li>User thấy option "Thử lại thanh toán"</li>
+                    <li><strong>Retry:</strong> Reuse existing booking, update status "failed" → "confirmed"</li>
+                </ol>
+            </div>
+            
+            <div class="step info">
+                <h3>🚫 User Cancel Scenario</h3>
+                <ol>
+                    <li>User điền form booking → Save pendingBooking</li>
+                    <li>User ở trang Payment nhưng click "Hủy đặt tour"</li>
+                    <li>handleCancelBooking() tạo booking với status "cancelled"</li>
+                    <li>Clear all localStorage data</li>
+                    <li>Redirect về homepage</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="flow-section">
+            <h2>🗃️ Database Schema Requirements:</h2>
+            
+            <div class="code-block">
+-- Bookings table cần các fields sau:
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS failed_at TIMESTAMP;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP;
+
+-- Index cho analytics
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_created_status ON bookings(created_at, status);
+CREATE INDEX IF NOT EXISTS idx_bookings_tour_status ON bookings(tour_id, status);
+</div>
+        </div>
+
+        <div class="flow-section">
+            <h2>📈 Analytics Dashboard Ideas:</h2>
+            
+            <div class="info-box">
+                <h3>🎯 Key Metrics to Track:</h3>
+                <ul>
+                    <li><strong>Conversion Funnel:</strong> Form → Payment → Success</li>
+                    <li><strong>Payment Method Performance:</strong> VNPay vs MoMo success rates</li>
+                    <li><strong>Tour Performance:</strong> Which tours have highest abandonment</li>
+                    <li><strong>Time-based Analysis:</strong> Peak failure times, seasonal trends</li>
+                    <li><strong>Retry Effectiveness:</strong> How many failed bookings become successful</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <h3>📊 Sample Dashboard Queries:</h3>
+                <div class="code-block">
+-- Daily conversion rates
+SELECT 
+  DATE(created_at) as date,
+  COUNT(*) as total_attempts,
+  COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as successful,
+  COUNT(CASE WHEN status = 'confirmed' THEN 1 END) * 100.0 / COUNT(*) as conversion_rate
+FROM bookings 
+WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY DATE(created_at)
+ORDER BY date DESC;
+
+-- Payment method effectiveness
+SELECT 
+  payment_method,
+  COUNT(*) as attempts,
+  COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as successful,
+  COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+  COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled
+FROM bookings 
+WHERE payment_method IS NOT NULL
+GROUP BY payment_method;
+</div>
+            </div>
+        </div>
+
+        <div class="flow-section">
+            <h2>🎉 Implementation Summary:</h2>
+            
+            <div class="success-box">
+                <h3>✅ Completed Features:</h3>
+                <ul>
+                    <li>🎯 <strong>Payment Failed Tracking:</strong> Tạo booking với status "failed"</li>
+                    <li>🔄 <strong>Retry Logic:</strong> Update existing failed booking instead of creating new</li>
+                    <li>🚫 <strong>User Cancel Tracking:</strong> Tạo booking với status "cancelled"</li>
+                    <li>📊 <strong>Business Analytics:</strong> Track user behavior throughout funnel</li>
+                    <li>🧹 <strong>Data Consistency:</strong> Proper localStorage cleanup</li>
+                    <li>🔗 <strong>Booking Continuity:</strong> Maintain booking relationship across retry attempts</li>
+                </ul>
+            </div>
+            
+            <div class="error-box">
+                <h3>⚠️ Backend Requirements:</h3>
+                <ul>
+                    <li>Database schema updates cho tracking fields</li>
+                    <li>PUT endpoint cho booking updates</li>
+                    <li>Analytics endpoints cho dashboard</li>
+                    <li>Email notifications chỉ cho status "confirmed"</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

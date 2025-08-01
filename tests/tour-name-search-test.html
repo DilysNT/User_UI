@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Tour Name Search</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .test-link { 
+            display: block; 
+            padding: 15px; 
+            margin: 10px 0; 
+            background: white; 
+            text-decoration: none; 
+            color: #333; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #007cba;
+        }
+        .test-link:hover { background: #f0f8ff; }
+        .dalat { border-left-color: #4caf50; }
+        .danang { border-left-color: #ff9800; }
+        .phuquoc { border-left-color: #2196f3; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .note { background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; }
+        .api-data {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Tour Name Search</h1>
+        
+        <div class="note">
+            <h3>📝 Test URLs cho tìm kiếm theo tên tour:</h3>
+            <p>Dựa trên dữ liệu API bạn cung cấp, chúng ta có các tour sau để test:</p>
+        </div>
+
+        <div class="api-data">
+            <h3>📊 Tours có sẵn trong API:</h3>
+            <ul>
+                <li><strong>Đà Lạt tours:</strong>
+                    <ul>
+                        <li>"Tour khám phá Đà Lạt 3N2Đ - Đồi chè, rừng thông" (location: "Đà Lạt")</li>
+                        <li>"Tour du lịch Đà Lạt 4N3Đ - Trải nghiệm ngàn hoa" (location: "Đà Lạt")</li>
+                        <li>"Tour Đà Lạt 3N2Đ" (destination: "Đà Lạt")</li>
+                        <li>"Tour Đà Lạt Mộng Mơ 3N2Đ" (location: "Đà Lạt")</li>
+                    </ul>
+                </li>
+                <li><strong>Đà Nẵng tours:</strong>
+                    <ul>
+                        <li>"Tour khám phá Đà Nẵng - Hội An 4N3Đ" (location: "Đà Nẵng")</li>
+                        <li>"Tour tham quan Đà Nẵng 4N3Đ" (location: "Đà Nẵng")</li>
+                    </ul>
+                </li>
+                <li><strong>Phú Quốc tours:</strong>
+                    <ul>
+                        <li>"Tour nghỉ dưỡng Phú Quốc cao cấp" (location: "Phú Quốc")</li>
+                        <li>"Tour khám phá Phú Quốc 3n2d" (location: "Phú Quốc")</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <h3>✅ Test Search by Tour Name - Đà Lạt</h3>
+        <a href="http://localhost:3000/search?tourName=Đà%20Lạt" class="test-link dalat">
+            Search: "Đà Lạt" - Should find 4 tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=Tour%20Đà%20Lạt" class="test-link dalat">
+            Search: "Tour Đà Lạt" - Should find 4 tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=khám%20phá%20Đà%20Lạt" class="test-link dalat">
+            Search: "khám phá Đà Lạt" - Should find 1 tour
+        </a>
+
+        <h3>🏖️ Test Search by Tour Name - Đà Nẵng</h3>
+        <a href="http://localhost:3000/search?tourName=Đà%20Nẵng" class="test-link danang">
+            Search: "Đà Nẵng" - Should find 2 tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=Hội%20An" class="test-link danang">
+            Search: "Hội An" - Should find 1 tour
+        </a>
+
+        <h3>🏝️ Test Search by Tour Name - Phú Quốc</h3>
+        <a href="http://localhost:3000/search?tourName=Phú%20Quốc" class="test-link phuquoc">
+            Search: "Phú Quốc" - Should find 2 tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=nghỉ%20dưỡng" class="test-link phuquoc">
+            Search: "nghỉ dưỡng" - Should find 1 tour
+        </a>
+
+        <h3>🔤 Test Case Sensitivity & Partial Matches</h3>
+        <a href="http://localhost:3000/search?tourName=da%20lat" class="test-link">
+            Search: "da lat" (lowercase) - Should find Đà Lạt tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=DA%20NANG" class="test-link">
+            Search: "DA NANG" (uppercase) - Should find Đà Nẵng tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=tour" class="test-link">
+            Search: "tour" - Should find many tours
+        </a>
+
+        <h3>❌ Test No Results</h3>
+        <a href="http://localhost:3000/search?tourName=Seoul" class="test-link">
+            Search: "Seoul" - Should find 0 tours
+        </a>
+        <a href="http://localhost:3000/search?tourName=xyz123" class="test-link">
+            Search: "xyz123" - Should find 0 tours
+        </a>
+
+        <div class="note">
+            <h3>🔍 Expected Behavior:</h3>
+            <ul>
+                <li>Tìm kiếm theo <code>tourName</code> sẽ match với <code>tour.name</code>, <code>tour.location</code>, và <code>tour.destination</code></li>
+                <li>Tìm kiếm không phân biệt hoa thường (case-insensitive)</li>
+                <li>Khi có <code>tourName</code>, nó sẽ bỏ qua các filter khác (destination, departure, dates)</li>
+                <li>Debug component sẽ hiển thị số lượng tours trước và sau filter</li>
+                <li>Console logs sẽ show chi tiết quá trình filter</li>
+            </ul>
+        </div>
+
+        <div class="note">
+            <h3>🐛 Debugging Steps:</h3>
+            <ol>
+                <li>Mở Developer Tools (F12)</li>
+                <li>Click vào một test link</li>
+                <li>Kiểm tra Console logs để xem:
+                    <ul>
+                        <li>Total tours fetched từ API</li>
+                        <li>tourName parameter được đọc từ URL</li>
+                        <li>Số tours sau khi filter</li>
+                    </ul>
+                </li>
+                <li>Kiểm tra debug component trên trang (màu xanh)</li>
+                <li>Verify kết quả hiển thị đúng</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

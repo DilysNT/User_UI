@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Children 50% Pricing Logic</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        .calculation { background: #e8f4f8; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { color: green; }
+        .info { color: blue; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>🧮 Test Children 50% Pricing Logic</h1>
+    
+    <div class="test-section">
+        <h2>Price Calculation Examples</h2>
+        <button onclick="testPricingLogic()">Test Different Scenarios</button>
+        <div id="pricing-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Custom Test</h2>
+        <label>Tour Price (₫): </label>
+        <input type="number" id="tourPrice" value="1000000" min="0">
+        <br><br>
+        <label>Adults: </label>
+        <input type="number" id="adults" value="2" min="0">
+        <br><br>
+        <label>Children: </label>
+        <input type="number" id="children" value="1" min="0">
+        <br><br>
+        <button onclick="calculateCustomPrice()">Calculate</button>
+        <div id="custom-result" class="result"></div>
+    </div>
+
+    <script>
+        function calculatePrice(tourPrice, adults, children) {
+            // Logic mới: trẻ em 50% giá
+            const adultPrice = tourPrice * adults;
+            const childPrice = tourPrice * 0.5 * children;
+            const totalPrice = adultPrice + childPrice;
+            
+            return {
+                tourPrice,
+                adults,
+                children,
+                adultPrice,
+                childPrice,
+                childPricePerPerson: tourPrice * 0.5,
+                totalPrice,
+                breakdown: {
+                    adultTotal: adultPrice,
+                    childTotal: childPrice,
+                    grandTotal: totalPrice
+                }
+            };
+        }
+
+        function formatVND(amount) {
+            return amount.toLocaleString('vi-VN') + '₫';
+        }
+
+        function testPricingLogic() {
+            const resultDiv = document.getElementById('pricing-result');
+            
+            const testCases = [
+                { tourPrice: 1000000, adults: 2, children: 0, description: "2 Adults, No Children" },
+                { tourPrice: 1000000, adults: 2, children: 1, description: "2 Adults, 1 Child" },
+                { tourPrice: 1000000, adults: 1, children: 2, description: "1 Adult, 2 Children" },
+                { tourPrice: 2000000, adults: 2, children: 2, description: "2 Adults, 2 Children (High Price)" },
+                { tourPrice: 500000, adults: 0, children: 3, description: "Only Children" },
+                { tourPrice: 1500000, adults: 4, children: 1, description: "Large Group" }
+            ];
+            
+            let html = '<h3>Pricing Test Results</h3>';
+            html += '<table>';
+            html += '<tr><th>Scenario</th><th>Tour Price</th><th>Adults</th><th>Children</th><th>Adult Total</th><th>Child Total</th><th>Grand Total</th><th>Savings vs Old Logic</th></tr>';
+            
+            testCases.forEach(testCase => {
+                const result = calculatePrice(testCase.tourPrice, testCase.adults, testCase.children);
+                
+                // Tính theo logic cũ (tất cả cùng giá) để so sánh
+                const oldLogicTotal = testCase.tourPrice * (testCase.adults + testCase.children);
+                const savings = oldLogicTotal - result.totalPrice;
+                
+                html += `<tr>
+                    <td><strong>${testCase.description}</strong></td>
+                    <td>${formatVND(testCase.tourPrice)}</td>
+                    <td>${testCase.adults}</td>
+                    <td>${testCase.children}</td>
+                    <td>${formatVND(result.adultPrice)}</td>
+                    <td>${formatVND(result.childPrice)}</td>
+                    <td><strong>${formatVND(result.totalPrice)}</strong></td>
+                    <td class="${savings > 0 ? 'success' : 'info'}">${formatVND(savings)}</td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            
+            // Thêm detailed breakdown cho case đầu tiên
+            const detailedCase = testCases[2]; // 1 Adult, 2 Children
+            const detailedResult = calculatePrice(detailedCase.tourPrice, detailedCase.adults, detailedCase.children);
+            
+            html += '<div class="calculation">';
+            html += '<h4>📊 Detailed Breakdown Example: 1 Adult + 2 Children</h4>';
+            html += `<p><strong>Tour Price:</strong> ${formatVND(detailedCase.tourPrice)}</p>`;
+            html += `<p><strong>Adult Calculation:</strong> ${detailedCase.adults} x ${formatVND(detailedCase.tourPrice)} = ${formatVND(detailedResult.adultPrice)}</p>`;
+            html += `<p><strong>Child Calculation:</strong> ${detailedCase.children} x ${formatVND(detailedResult.childPricePerPerson)} (50% of ${formatVND(detailedCase.tourPrice)}) = ${formatVND(detailedResult.childPrice)}</p>`;
+            html += `<p><strong>Total:</strong> ${formatVND(detailedResult.adultPrice)} + ${formatVND(detailedResult.childPrice)} = <strong>${formatVND(detailedResult.totalPrice)}</strong></p>`;
+            
+            const oldTotal = detailedCase.tourPrice * (detailedCase.adults + detailedCase.children);
+            const savings = oldTotal - detailedResult.totalPrice;
+            html += `<p class="success"><strong>Savings vs Old Logic:</strong> ${formatVND(oldTotal)} - ${formatVND(detailedResult.totalPrice)} = ${formatVND(savings)}</p>`;
+            html += '</div>';
+            
+            resultDiv.innerHTML = html;
+        }
+
+        function calculateCustomPrice() {
+            const tourPrice = parseInt(document.getElementById('tourPrice').value) || 0;
+            const adults = parseInt(document.getElementById('adults').value) || 0;
+            const children = parseInt(document.getElementById('children').value) || 0;
+            
+            const result = calculatePrice(tourPrice, adults, children);
+            const oldLogicTotal = tourPrice * (adults + children);
+            const savings = oldLogicTotal - result.totalPrice;
+            
+            const resultDiv = document.getElementById('custom-result');
+            resultDiv.innerHTML = `
+                <div class="calculation">
+                    <h4>🧮 Custom Calculation Result</h4>
+                    <p><strong>Tour Price:</strong> ${formatVND(tourPrice)}</p>
+                    <p><strong>Participants:</strong> ${adults} adults + ${children} children</p>
+                    <hr>
+                    <p><strong>Adult Total:</strong> ${adults} x ${formatVND(tourPrice)} = ${formatVND(result.adultPrice)}</p>
+                    <p><strong>Child Total:</strong> ${children} x ${formatVND(result.childPricePerPerson)} = ${formatVND(result.childPrice)}</p>
+                    <hr>
+                    <p><strong>Grand Total:</strong> ${formatVND(result.totalPrice)}</p>
+                    <p><strong>Old Logic Total:</strong> ${formatVND(oldLogicTotal)}</p>
+                    <p class="${savings >= 0 ? 'success' : 'info'}"><strong>Difference:</strong> ${formatVND(savings)} ${savings >= 0 ? '(Savings)' : '(More Expensive)'}</p>
+                </div>
+            `;
+        }
+
+        // Auto-run test on page load
+        window.onload = function() {
+            testPricingLogic();
+        };
+    </script>
+</body>
+</html>

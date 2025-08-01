@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Search Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .result { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto; }
+        button { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .search-params { background: #e9ecef; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Search Issue</h1>
+        
+        <div class="search-params">
+            <h3>🎯 Search Parameters (User's Request)</h3>
+            <div><strong>Điểm đến:</strong> Đà Lạt</div>
+            <div><strong>Điểm xuất phát:</strong> TP.Hồ Chí Minh</div>
+            <div><strong>Sắp xếp:</strong> Phổ biến</div>
+        </div>
+        
+        <button onclick="debugSearch()">Debug Search Process</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function debugSearch() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div>🔄 Debugging search process...</div>';
+            
+            try {
+                // Step 1: Get all tours
+                const toursResponse = await fetch('http://localhost:5000/api/tours');
+                
+                if (!toursResponse.ok) {
+                    throw new Error(`Tours API failed: HTTP ${toursResponse.status}`);
+                }
+                
+                const toursData = await toursResponse.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        <h3>✅ Step 1: Tours API Success</h3>
+                        <div><strong>Total tours:</strong> ${Array.isArray(toursData) ? toursData.length : 'Not an array'}</div>
+                    </div>
+                `;
+                
+                if (!Array.isArray(toursData) || toursData.length === 0) {
+                    resultDiv.innerHTML += `
+                        <div class="result error">
+                            <h3>❌ No Tours Data</h3>
+                            <div>API returned no tours or invalid format</div>
+                            <pre>${JSON.stringify(toursData, null, 2)}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Step 2: Filter by destination (Đà Lạt)
+                const dalатTours = toursData.filter(tour => {
+                    const destination = tour.destination?.toLowerCase() || '';
+                    const name = tour.name?.toLowerCase() || '';
+                    return destination.includes('đà lạt') || name.includes('đà lạt');
+                });
+                
+                resultDiv.innerHTML += `
+                    <div class="result ${dalатTours.length > 0 ? 'success' : 'warning'}">
+                        <h3>🎯 Step 2: Filter by "Đà Lạt"</h3>
+                        <div><strong>Found tours:</strong> ${dalатTours.length}</div>
+                        ${dalатTours.length > 0 ? `<pre>${JSON.stringify(dalатTours.slice(0, 3), null, 2)}</pre>` : ''}
+                    </div>
+                `;
+                
+                // Step 3: Filter by departure (TP.Hồ Chí Minh)
+                const filteredTours = dalатTours.filter(tour => {
+                    const departure = tour.departure_location?.toLowerCase() || '';
+                    return departure.includes('hồ chí minh') || departure.includes('tp.hồ chí minh') || departure.includes('tphcm');
+                });
+                
+                resultDiv.innerHTML += `
+                    <div class="result ${filteredTours.length > 0 ? 'success' : 'error'}">
+                        <h3>🚩 Step 3: Filter by "TP.Hồ Chí Minh"</h3>
+                        <div><strong>Final results:</strong> ${filteredTours.length}</div>
+                        ${filteredTours.length > 0 ? `<pre>${JSON.stringify(filteredTours, null, 2)}</pre>` : ''}
+                    </div>
+                `;
+                
+                // Step 4: Analyze tour structure
+                if (toursData.length > 0) {
+                    const sampleTour = toursData[0];
+                    const tourKeys = Object.keys(sampleTour);
+                    
+                    resultDiv.innerHTML += `
+                        <div class="result">
+                            <h3>📋 Step 4: Tour Data Structure Analysis</h3>
+                            <div><strong>Available fields:</strong> ${tourKeys.join(', ')}</div>
+                            <div><strong>Sample tour:</strong></div>
+                            <pre>${JSON.stringify(sampleTour, null, 2)}</pre>
+                        </div>
+                    `;
+                    
+                    // Check destination field variations
+                    const destinationFields = toursData.map(tour => ({
+                        name: tour.name,
+                        destination: tour.destination,
+                        departure_location: tour.departure_location,
+                        location: tour.location
+                    }));
+                    
+                    resultDiv.innerHTML += `
+                        <div class="result">
+                            <h3>🎯 Step 5: Destination Field Analysis</h3>
+                            <div><strong>First 5 tours destination info:</strong></div>
+                            <pre>${JSON.stringify(destinationFields.slice(0, 5), null, 2)}</pre>
+                        </div>
+                    `;
+                }
+                
+                // Step 6: Test different search strategies
+                const searchStrategies = [
+                    {
+                        name: 'Strategy 1: By tour.destination',
+                        filter: tour => tour.destination?.toLowerCase().includes('đà lạt')
+                    },
+                    {
+                        name: 'Strategy 2: By tour.name',
+                        filter: tour => tour.name?.toLowerCase().includes('đà lạt')
+                    },
+                    {
+                        name: 'Strategy 3: By tour.location',
+                        filter: tour => tour.location?.toLowerCase().includes('đà lạt')
+                    },
+                    {
+                        name: 'Strategy 4: Any field contains "đà lạt"',
+                        filter: tour => JSON.stringify(tour).toLowerCase().includes('đà lạt')
+                    }
+                ];
+                
+                let strategyResults = '';
+                searchStrategies.forEach(strategy => {
+                    const results = toursData.filter(strategy.filter);
+                    strategyResults += `
+                        <div><strong>${strategy.name}:</strong> ${results.length} tours</div>
+                    `;
+                });
+                
+                resultDiv.innerHTML += `
+                    <div class="result">
+                        <h3>🧪 Step 6: Different Search Strategies</h3>
+                        ${strategyResults}
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML += `
+                    <div class="result error">
+                        <h3>❌ Error</h3>
+                        <div><strong>Error:</strong> ${error.message}</div>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+        
+        // Auto-run on page load
+        window.onload = debugSearch;
+    </script>
+</body>
+</html>

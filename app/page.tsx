@@ -11,6 +11,7 @@ import LatestStories from "@/components/home/latest-stories";
 import Footer from "@/components/home/footer";
 import Image from "next/image";
 import CityState from "@/components/home/CityState";
+import PublicPromoCodes from "@/components/home/public-promo-codes";
 
 // Dữ liệu ảo cho demo
 const fakeTour = {
@@ -99,7 +100,9 @@ export default function Home() {
           <HeroSection />
         </div>
       </div>
+      <PublicPromoCodes />
       <CityState />
+      
       <FeaturedDestinations />
       <Gallery />
       <LatestStories />

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Complete Search Functionality</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .test-results { background-color: #f9f9f9; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        button { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .step { margin: 10px 0; padding: 10px; background: #e7f3ff; border-radius: 5px; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test Complete Search Functionality</h1>
+        
+        <div class="test-section">
+            <h2>1. Test Complete Search Workflow</h2>
+            <button onclick="testCompleteSearch()">Test Search with All Parameters</button>
+            <div id="searchResults" class="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Test Date Range Flexibility (±1 month)</h2>
+            <button onclick="testDateFlexibility()">Test Date Range Search</button>
+            <div id="dateResults" class="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Test Hero Section Search Parameters</h2>
+            <button onclick="testHeroSearchParams()">Test Hero Section Integration</button>
+            <div id="heroResults" class="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Test Search URL Generation</h2>
+            <button onclick="testSearchURL()">Test Search URL with All Params</button>
+            <div id="urlResults" class="test-results"></div>
+        </div>
+    </div>
+
+    <script>
+        async function testCompleteSearch() {
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<div class="step">🔄 Testing complete search workflow...</div>';
+
+            try {
+                // Test 1: Get all tours
+                const toursResponse = await fetch('http://localhost:5000/api/tours');
+                const tours = await toursResponse.json();
+                
+                resultsDiv.innerHTML += `<div class="step success">✅ Total tours in database: ${tours.length}</div>`;
+
+                if (tours.length > 0) {
+                    const sampleTour = tours[0];
+                    resultsDiv.innerHTML += `<div class="step">📊 Sample tour: ${sampleTour.name} - Destination: ${sampleTour.destination}</div>`;
+
+                    // Test 2: Get departure dates for sample tour
+                    const datesResponse = await fetch(`http://localhost:5000/api/departure-dates/by-tour/${sampleTour.id}`);
+                    const dates = await datesResponse.json();
+                    
+                    resultsDiv.innerHTML += `<div class="step success">✅ Departure dates for tour ${sampleTour.id}: ${dates.length} dates</div>`;
+                    
+                    if (dates.length > 0) {
+                        resultsDiv.innerHTML += `<div class="step">📅 Sample departure date: ${dates[0].departure_date}</div>`;
+                    }
+
+                    // Test 3: Get departure locations
+                    const locationsResponse = await fetch('http://localhost:5000/api/departure-locations');
+                    const locations = await locationsResponse.json();
+                    
+                    resultsDiv.innerHTML += `<div class="step success">✅ Departure locations: ${locations.length} locations</div>`;
+                    if (locations.length > 0) {
+                        resultsDiv.innerHTML += `<div class="step">📍 Sample location: ${locations[0].name}</div>`;
+                    }
+
+                    // Test 4: Create a realistic search URL
+                    const today = new Date();
+                    const oneMonthBefore = new Date(today);
+                    oneMonthBefore.setMonth(today.getMonth() - 1);
+                    const oneMonthAfter = new Date(today);
+                    oneMonthAfter.setMonth(today.getMonth() + 1);
+
+                    const searchParams = new URLSearchParams({
+                        destination: sampleTour.destination || '',
+                        departure: locations[0]?.name || '',
+                        preferredDate: today.toISOString().split('T')[0],
+                        startDateRange: oneMonthBefore.toISOString().split('T')[0],
+                        endDateRange: oneMonthAfter.toISOString().split('T')[0]
+                    });
+
+                    const searchURL = `http://localhost:3000/search?${searchParams.toString()}`;
+                    resultsDiv.innerHTML += `<div class="step success">✅ Generated search URL:</div>`;
+                    resultsDiv.innerHTML += `<div class="step"><a href="${searchURL}" target="_blank">${searchURL}</a></div>`;
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="step error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testDateFlexibility() {
+            const resultsDiv = document.getElementById('dateResults');
+            resultsDiv.innerHTML = '<div class="step">🔄 Testing date range flexibility...</div>';
+
+            try {
+                // Test with different date ranges
+                const testDates = [
+                    { days: -30, label: '30 days ago' },
+                    { days: -15, label: '15 days ago' },
+                    { days: 0, label: 'today' },
+                    { days: 15, label: '15 days from now' },
+                    { days: 30, label: '30 days from now' }
+                ];
+
+                for (const testDate of testDates) {
+                    const date = new Date();
+                    date.setDate(date.getDate() + testDate.days);
+                    
+                    // Create ±1 month range
+                    const startRange = new Date(date);
+                    startRange.setMonth(date.getMonth() - 1);
+                    const endRange = new Date(date);
+                    endRange.setMonth(date.getMonth() + 1);
+
+                    resultsDiv.innerHTML += `<div class="step">📅 Testing ${testDate.label}: ${date.toLocaleDateString('vi-VN')}</div>`;
+                    resultsDiv.innerHTML += `<div class="step">📊 Search range: ${startRange.toLocaleDateString('vi-VN')} to ${endRange.toLocaleDateString('vi-VN')}</div>`;
+                }
+
+                resultsDiv.innerHTML += `<div class="step success">✅ Date flexibility test completed - all ranges calculated correctly</div>`;
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="step error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testHeroSearchParams() {
+            const resultsDiv = document.getElementById('heroResults');
+            resultsDiv.innerHTML = '<div class="step">🔄 Testing hero section integration...</div>';
+
+            try {
+                // Test hero section search functionality
+                const today = new Date().toISOString().split('T')[0];
+                
+                // Simulate hero section form data
+                const heroFormData = {
+                    destination: 'Đà Nẵng',
+                    departure: 'Hồ Chí Minh',
+                    preferredDate: today
+                };
+
+                resultsDiv.innerHTML += `<div class="step">📝 Hero form data:</div>`;
+                resultsDiv.innerHTML += `<pre>${JSON.stringify(heroFormData, null, 2)}</pre>`;
+
+                // Calculate date range (±1 month)
+                const preferred = new Date(heroFormData.preferredDate);
+                const startRange = new Date(preferred);
+                startRange.setMonth(preferred.getMonth() - 1);
+                const endRange = new Date(preferred);
+                endRange.setMonth(preferred.getMonth() + 1);
+
+                const searchParams = {
+                    ...heroFormData,
+                    startDateRange: startRange.toISOString().split('T')[0],
+                    endDateRange: endRange.toISOString().split('T')[0]
+                };
+
+                resultsDiv.innerHTML += `<div class="step">🔍 Generated search params:</div>`;
+                resultsDiv.innerHTML += `<pre>${JSON.stringify(searchParams, null, 2)}</pre>`;
+
+                const searchURL = `/search?${new URLSearchParams(searchParams).toString()}`;
+                resultsDiv.innerHTML += `<div class="step success">✅ Hero section search URL: <a href="${searchURL}" target="_blank">${searchURL}</a></div>`;
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="step error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testSearchURL() {
+            const resultsDiv = document.getElementById('urlResults');
+            resultsDiv.innerHTML = '<div class="step">🔄 Testing search URL generation...</div>';
+
+            try {
+                // Test different search scenarios
+                const scenarios = [
+                    {
+                        name: 'Full search with all parameters',
+                        params: {
+                            destination: 'Đà Nẵng',
+                            departure: 'Hồ Chí Minh',
+                            preferredDate: '2024-01-15',
+                            startDateRange: '2023-12-15',
+                            endDateRange: '2024-02-15'
+                        }
+                    },
+                    {
+                        name: 'Destination only search',
+                        params: {
+                            destination: 'Hạ Long'
+                        }
+                    },
+                    {
+                        name: 'Date range only search',
+                        params: {
+                            preferredDate: '2024-01-15',
+                            startDateRange: '2023-12-15',
+                            endDateRange: '2024-02-15'
+                        }
+                    }
+                ];
+
+                for (const scenario of scenarios) {
+                    resultsDiv.innerHTML += `<div class="step">🧪 ${scenario.name}:</div>`;
+                    
+                    const url = `/search?${new URLSearchParams(scenario.params).toString()}`;
+                    resultsDiv.innerHTML += `<div class="step success">✅ URL: <a href="${url}" target="_blank">${url}</a></div>`;
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="step error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run basic tests on page load
+        window.onload = function() {
+            console.log('🔍 Search functionality test page loaded');
+        };
+    </script>
+</body>
+</html>

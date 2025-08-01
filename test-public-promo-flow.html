@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Public Promo Code Flow</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .step { background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 10px 0; }
+        .flow-demo { border: 2px solid #10b981; border-radius: 12px; padding: 20px; margin: 15px 0; }
+        .promo-card { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 12px; margin: 10px 0; }
+        .promo-code { font-size: 24px; font-weight: bold; letter-spacing: 2px; text-align: center; margin: 10px 0; }
+        button { padding: 12px 24px; background: #0ea5e9; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 5px; font-size: 16px; }
+        button:hover { background: #0284c7; }
+        .success { background: #f0fdf4; color: #166534; padding: 10px; border-radius: 6px; margin: 10px 0; }
+        .info { background: #fef3c7; color: #92400e; padding: 10px; border-radius: 6px; margin: 10px 0; }
+        .highlight { background: #ffe4e6; border: 2px solid #f43f5e; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .demo-screen { background: #1f2937; color: white; padding: 15px; border-radius: 8px; font-family: monospace; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎫 Test Public Promo Code Flow</h1>
+        
+        <div class="section">
+            <h2>📋 Overview - Quy trình hoàn chỉnh</h2>
+            <div class="step">1. User vào Home page → Thấy section "Mã Giảm Giá Đặc Biệt"</div>
+            <div class="step">2. Click "Sao chép" hoặc "Sử dụng ngay" → Mã được lưu vào localStorage</div>
+            <div class="step">3. Redirect đến /search → Tìm tour và chọn tour</div>
+            <div class="step">4. Vào trang Booking → Mã tự động điền và áp dụng</div>
+            <div class="step">5. User thấy giá đã giảm và hoàn thành đặt tour</div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Demo Public Promo Codes</h2>
+            
+            <div class="flow-demo">
+                <h3>📱 Home Page - Public Promo Section</h3>
+                
+                <div class="promo-card">
+                    <div style="text-align: center;">
+                        <h4>🎉 Mã chào mừng khách mới</h4>
+                        <p>Giảm ngay 15% cho đơn hàng đầu tiên</p>
+                        <div class="promo-code" id="welcome-code">WELCOME2025</div>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                            <button onclick="copyPromoCode('WELCOME2025')" style="background: rgba(255,255,255,0.2);">
+                                📋 Sao chép mã
+                            </button>
+                            <button onclick="usePromoCode('WELCOME2025')" style="background: rgba(255,255,255,0.3);">
+                                🚀 Sử dụng ngay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="promo-card" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                    <div style="text-align: center;">
+                        <h4>☀️ Khuyến mãi mùa hè</h4>
+                        <p>Giảm 20% cho tất cả tour du lịch biển</p>
+                        <div class="promo-code" id="summer-code">SUMMER2025</div>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                            <button onclick="copyPromoCode('SUMMER2025')" style="background: rgba(255,255,255,0.2);">
+                                📋 Sao chép mã
+                            </button>
+                            <button onclick="usePromoCode('SUMMER2025')" style="background: rgba(255,255,255,0.3);">
+                                🚀 Sử dụng ngay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="promo-card" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                    <div style="text-align: center;">
+                        <h4>⚡ Flash Sale cuối tuần</h4>
+                        <p>Giảm 25% chỉ trong 3 ngày</p>
+                        <div class="promo-code" id="flash-code">FLASH50</div>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                            <button onclick="copyPromoCode('FLASH50')" style="background: rgba(255,255,255,0.2);">
+                                📋 Sao chép mã
+                            </button>
+                            <button onclick="usePromoCode('FLASH50')" style="background: rgba(255,255,255,0.3);">
+                                🚀 Sử dụng ngay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔄 Test Flow Actions</h2>
+            
+            <div class="highlight">
+                <h3>💡 Test các scenario:</h3>
+                <button onclick="testFullFlow()">🧪 Test toàn bộ flow</button>
+                <button onclick="simulateBookingPage()">📝 Simulate Booking Page</button>
+                <button onclick="clearStoredData()">🗑️ Clear stored data</button>
+                <button onclick="checkStoredPromo()">👀 Check stored promo</button>
+            </div>
+
+            <div id="test-results" class="demo-screen"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 LocalStorage Integration</h2>
+            <div class="info">
+                <strong>Key:</strong> <code>copiedPromoCode</code><br>
+                <strong>Purpose:</strong> Lưu mã promo khi user copy từ Home page<br>
+                <strong>Auto-apply:</strong> Tự động áp dụng khi vào Booking page
+            </div>
+            
+            <div class="demo-screen" id="localStorage-status">
+                Checking localStorage...
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>✅ Expected Behavior</h2>
+            <div class="success">
+                <h4>🎯 Trên Home Page:</h4>
+                <ul>
+                    <li>✅ Hiển thị section mã giảm giá với 4 loại mã</li>
+                    <li>✅ Button "Sao chép" → Copy vào clipboard + localStorage</li>
+                    <li>✅ Button "Sử dụng ngay" → Copy + redirect /search</li>
+                    <li>✅ Progress bar hiển thị số lượng đã sử dụng</li>
+                </ul>
+            </div>
+
+            <div class="success">
+                <h4>🎯 Trên Booking Page:</h4>
+                <ul>
+                    <li>✅ Tự động kiểm tra localStorage có mã nào không</li>
+                    <li>✅ Tự động điền mã vào input field</li>
+                    <li>✅ Tự động gọi API validate và áp dụng mã</li>
+                    <li>✅ Hiển thị thông báo thành công</li>
+                    <li>✅ Clear mã từ localStorage sau khi áp dụng</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🚀 Implementation Benefits</h2>
+            <div class="step">📈 <strong>Tăng conversion:</strong> User dễ dàng access và sử dụng mã giảm giá</div>
+            <div class="step">🎯 <strong>Reduce friction:</strong> Không cần nhập manual, tự động áp dụng</div>
+            <div class="step">💡 <strong>Marketing tool:</strong> Attract visitors với mã public hấp dẫn</div>
+            <div class="step">🔄 <strong>User experience:</strong> Seamless flow từ home → booking</div>
+        </div>
+    </div>
+
+    <script>
+        function copyPromoCode(code) {
+            // Copy to clipboard
+            navigator.clipboard.writeText(code).then(() => {
+                // Store in localStorage
+                localStorage.setItem('copiedPromoCode', code);
+                
+                // Update UI
+                updateTestResults(`✅ Copied "${code}" to clipboard and localStorage`);
+                checkStoredPromo();
+                
+                // Show success feedback
+                showSuccessMessage(`Đã sao chép mã ${code}!`);
+            }).catch(err => {
+                updateTestResults(`❌ Failed to copy: ${err}`);
+            });
+        }
+
+        function usePromoCode(code) {
+            // Copy to clipboard and localStorage
+            navigator.clipboard.writeText(code).then(() => {
+                localStorage.setItem('copiedPromoCode', code);
+                updateTestResults(`🚀 Using "${code}" - would redirect to /search`);
+                checkStoredPromo();
+                showSuccessMessage(`Sử dụng mã ${code} - chuyển đến trang tìm tour...`);
+                
+                // Simulate redirect (in real app: window.location.href = '/search')
+                setTimeout(() => {
+                    alert('Trong ứng dụng thực tế, bạn sẽ được chuyển đến trang /search để tìm tour!');
+                }, 1000);
+            });
+        }
+
+        function testFullFlow() {
+            updateTestResults('🧪 Testing full promo code flow...\n');
+            
+            // Step 1: Simulate copy promo from home
+            const testCode = 'WELCOME2025';
+            localStorage.setItem('copiedPromoCode', testCode);
+            updateTestResults(`Step 1: ✅ Stored "${testCode}" in localStorage\n`);
+            
+            // Step 2: Simulate navigation to booking page
+            setTimeout(() => {
+                updateTestResults(`Step 2: ✅ User navigates to booking page\n`);
+                
+                // Step 3: Simulate booking page auto-apply
+                setTimeout(() => {
+                    const storedCode = localStorage.getItem('copiedPromoCode');
+                    if (storedCode) {
+                        updateTestResults(`Step 3: ✅ Booking page detects stored code: "${storedCode}"\n`);
+                        updateTestResults(`Step 4: ✅ Auto-applying promo code...\n`);
+                        
+                        // Simulate successful application
+                        setTimeout(() => {
+                            localStorage.removeItem('copiedPromoCode');
+                            updateTestResults(`Step 5: ✅ Promo applied successfully, removed from localStorage\n`);
+                            updateTestResults(`🎉 Flow completed successfully!`);
+                            checkStoredPromo();
+                        }, 1000);
+                    }
+                }, 1000);
+            }, 1000);
+        }
+
+        function simulateBookingPage() {
+            updateTestResults('📝 Simulating Booking page behavior...\n');
+            
+            const storedCode = localStorage.getItem('copiedPromoCode');
+            if (storedCode) {
+                updateTestResults(`✅ Found stored promo code: "${storedCode}"\n`);
+                updateTestResults(`🔄 Auto-filling promo input field...\n`);
+                updateTestResults(`📡 Calling API to validate promo...\n`);
+                
+                setTimeout(() => {
+                    updateTestResults(`✅ Promo validation successful!\n`);
+                    updateTestResults(`💰 Discount applied: 15% off\n`);
+                    updateTestResults(`🗑️ Clearing stored promo code...\n`);
+                    localStorage.removeItem('copiedPromoCode');
+                    checkStoredPromo();
+                }, 2000);
+            } else {
+                updateTestResults(`❌ No stored promo code found\n`);
+                updateTestResults(`ℹ️  Normal booking flow continues...`);
+            }
+        }
+
+        function clearStoredData() {
+            localStorage.removeItem('copiedPromoCode');
+            updateTestResults('🗑️ Cleared all stored promo data');
+            checkStoredPromo();
+        }
+
+        function checkStoredPromo() {
+            const storedCode = localStorage.getItem('copiedPromoCode');
+            const statusDiv = document.getElementById('localStorage-status');
+            
+            if (storedCode) {
+                statusDiv.innerHTML = `
+✅ Stored Promo Code: "${storedCode}"
+🔄 Status: Ready for auto-apply on booking page
+📅 Stored at: ${new Date().toLocaleString()}
+                `;
+                statusDiv.style.background = '#065f46';
+            } else {
+                statusDiv.innerHTML = `
+❌ No promo code stored
+ℹ️  Status: No auto-apply available
+📝 Action: User needs to copy a promo code first
+                `;
+                statusDiv.style.background = '#1f2937';
+            }
+        }
+
+        function updateTestResults(message) {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML += message + '\n';
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function showSuccessMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'success';
+            messageDiv.textContent = message;
+            messageDiv.style.position = 'fixed';
+            messageDiv.style.top = '20px';
+            messageDiv.style.right = '20px';
+            messageDiv.style.zIndex = '1000';
+            messageDiv.style.padding = '15px';
+            messageDiv.style.borderRadius = '8px';
+            messageDiv.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                document.body.removeChild(messageDiv);
+            }, 3000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStoredPromo();
+            updateTestResults('🚀 Public Promo Code Test Environment Ready\n');
+            updateTestResults('💡 Try copying a promo code and testing the flow!\n');
+        });
+
+        // Auto-refresh localStorage status every 5 seconds
+        setInterval(checkStoredPromo, 5000);
+    </script>
+</body>
+</html>

@@ -42,21 +42,29 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [departureDates, setDepartureDates] = useState<any[]>([]);
+  // availableSlots is now directly from departureDates API
+  const [availableSlots, setAvailableSlots] = useState<number | null>(null);
 
-  // Fetch tất cả thông tin tour khi có tourId
+
+  // Fetch tất cả thông tin tour khi có tourId, lấy luôn departureDates từ API /complete
   useEffect(() => {
     if (!tourId) return;
     fetch(`http://localhost:5000/api/tours/${tourId}/complete`)
       .then(res => res.json())
       .then(data => {
         console.log('Tour data from API:', data); // Debug log
-        setTour(data); // ĐÚNG: data là object tour
+        // Đảm bảo có trường agency_name trong tour object
+        let tourData = { ...data };
+        if (!tourData.agency_name && tourData.agency && tourData.agency.name) {
+          tourData.agency_name = tourData.agency.name;
+        }
+        setTour(tourData);
         setItineraries(data.itineraries || []);
         setIncludedServices(data.includedServices || []);
         setExcludedServices(data.excludedServices || []);
         setHotels(data.hotels || []);
         setTourCategories(data.tourCategories || []);
-        // Có thể set thêm các trường khác nếu cần
+        setDepartureDates(data.departureDates || []); // Lấy departureDates từ API /complete
       })
       .catch(() => {
         setTour(null);
@@ -65,42 +73,48 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
         setExcludedServices([]);
         setHotels([]);
         setTourCategories([]);
+        setDepartureDates([]);
       });
   }, [tourId]);
 
-  // Fetch ngày khởi hành riêng nếu cần
+  // No need to fetch available slots from bookings. Use available_slots from departureDates API.
+
+
+  // Update availableSlots when selectedDepartureDateId or departureDates changes
   useEffect(() => {
-    if (!tourId) return;
-    fetch(`http://localhost:5000/api/departure-dates/by-tour/${tourId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setDepartureDates(data);
-        else if (data && Array.isArray(data.departureDates)) setDepartureDates(data.departureDates);
-        else setDepartureDates([]);
-      })
-      .catch(() => setDepartureDates([]));
-  }, [tourId]);
+    if (departureDates.length === 0) {
+      setAvailableSlots(null);
+      return;
+    }
+    if (selectedDepartureDateId) {
+      const dateObj = departureDates.find((d: any) => d.id === selectedDepartureDateId || d.departureDates_id === selectedDepartureDateId);
+      setAvailableSlots(dateObj?.available_slots ?? null);
+    } else {
+      // Nếu chưa chọn ngày, lấy available_slots của ngày đầu tiên (gần nhất)
+      setAvailableSlots(departureDates[0]?.available_slots ?? null);
+    }
+  }, [selectedDepartureDateId, departureDates]);
 
   const handleChangeAdults = (delta: number) => {
     setAdults((prev) => {
       const newValue = prev + delta;
-      // Validation: min 1, max theo tour.max_participants
+      // Validation: min 1, max theo available slots còn lại
       if (newValue < 1) return 1;
-      if (tour.max_participants && newValue > tour.max_participants) {
-        alert(`Số lượng người lớn không được vượt quá ${tour.max_participants} người`);
+      if (availableSlots !== null && availableSlots > 0 && (newValue + children) > availableSlots) {
+        alert(`Chỉ còn ${availableSlots} chỗ trống cho ngày khởi hành này`);
         return prev;
       }
       return newValue;
     });
   };
-  
+
   const handleChangeChildren = (delta: number) => {
     setChildren((prev) => {
       const newValue = prev + delta;
-      // Validation: min 0, max theo tour.max_participants (tổng với adults)
+      // Validation: min 0, max theo available slots còn lại
       if (newValue < 0) return 0;
-      if (tour.max_participants && (adults + newValue) > tour.max_participants) {
-        alert(`Tổng số người không được vượt quá ${tour.max_participants} người`);
+      if (availableSlots !== null && availableSlots > 0 && (adults + newValue) > availableSlots) {
+        alert(`Chỉ còn ${availableSlots} chỗ trống cho ngày khởi hành này`);
         return prev;
       }
       return newValue;
@@ -113,70 +127,51 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
 
   // Khi user bấm Đặt tour:
   const handleBookTour = () => {
-    // Lấy ảnh chính để lưu vào localStorage
+    // Lấy ảnh chính để lưu vào localStorage (ưu tiên ảnh chính, fallback ảnh đầu tiên, fallback placeholder)
     let mainImage = "/placeholder.svg";
     if (tour.images && Array.isArray(tour.images) && tour.images.length > 0) {
-      const mainImg = tour.images.find(img => img.is_main);
-      if (mainImg) {
+      // Ưu tiên ảnh có is_main === true, nếu không có thì lấy ảnh đầu tiên
+      const mainImg = tour.images.find((img: any) => img.is_main === true && img.image_url);
+      if (mainImg && mainImg.image_url) {
         mainImage = mainImg.image_url;
-      } else {
+      } else if (tour.images[0].image_url) {
         mainImage = tour.images[0].image_url;
       }
     }
 
-    // Lấy location từ tour data, ưu tiên location trước (địa điểm chính), sau đó destination
-    const location = tour.location || tour.destination || tour.city || tour.place || 'Việt Nam';
-    
-    // Lấy thông tin đầy đủ để truyền sang booking
-    const departureLocation = tour.departure_location || 'Không xác định';
-    
-    // Lấy tour categories từ mảng tourCategories
-    const tourCategoryNames = tourCategories.length > 0 
-      ? tourCategories.map(cat => cat.name || cat.category_name).join(', ') 
-      : (tour.tour_type || 'Không xác định');
-
-    // Tính duration từ itinerary hoặc tour data
-    const duration = tour.duration || 
-      (tour.itinerary && Array.isArray(tour.itinerary) ? 
-        `${tour.itinerary.length} ngày ${tour.itinerary.length - 1} đêm` : 
-        '4N3Đ');
-
-    // Lấy thông tin agency từ user hiện tại (nếu có)
-    const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
-    const agencyId = currentUser?.agency_id || null;
-    const referralCode = typeof window !== 'undefined' ? localStorage.getItem('referral_code') || null : null;
-
-    // Lưu thông tin tour + các state đã chọn vào localStorage
+    // Lưu thông tin tour + các state đã chọn vào localStorage, đảm bảo có trường 'image'
     localStorage.setItem('selectedTour', JSON.stringify({
       ...tour,
       adults,
       children,
       departure_date_id: selectedDepartureDateId,
       departure_date_value: selectedDepartureDateValue,
-      image: mainImage, // Thêm ảnh chính
-      location: location, // Địa điểm đến
-      departure_location: departureLocation, // Điểm khởi hành
-      tour_categories: tourCategoryNames, // Nhóm tour/category từ DB
-      duration: duration, // Thời gian tour
-      tourCategories: tourCategories, // Lưu cả mảng categories gốc
-      agency_id: agencyId, // ID agency để tính phí VAT
-      referral_code: referralCode, // Mã giới thiệu để tracking
+      image: mainImage, // Đảm bảo luôn có trường image cho booking info card
     }));
-    
-    console.log('Saved tour data with commission info:', { 
-      ...tour, 
-      location, 
-      departure_location: departureLocation,
-      tour_categories: tourCategoryNames,
-      duration: duration,
-      tourCategories: tourCategories,
-      image: mainImage,
-      agency_id: agencyId,
-      referral_code: referralCode 
-    }); // Debug log
-    
-    // Chuyển sang trang booking với tourId
     router.push(`/booking/${tour.id}`);
+  };
+
+  // ...existing code for galleryImages, etc...
+
+  // Xử lý gallery ảnh từ tour.images nếu có
+  const defaultGalleryImages = [
+    "/VinhHaLongBG.jpeg",
+    "/VinhHaLong.jpeg",
+    "/halong.jpeg",
+    "/hoian.jpeg",
+    "/cauvan.jpeg",
+    "/phongnha.jpeg",
+  ];
+
+  let galleryImages: string[] = defaultGalleryImages;
+  if (tour && tour.images && Array.isArray(tour.images) && tour.images.length > 0) {
+    // Đưa ảnh chính (is_main) lên đầu, sau đó các ảnh còn lại
+    const mainImg = tour.images.find((img: any) => img.is_main);
+    const otherImgs = tour.images.filter((img: any) => !img.is_main);
+    galleryImages = [
+      ...(mainImg ? [mainImg.image_url] : []),
+      ...otherImgs.map((img: any) => img.image_url)
+    ];
   }
 
   if (!tour) {
@@ -189,38 +184,15 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
     );
   }
 
-  // Xử lý gallery ảnh từ tour.images nếu có
-  const defaultGalleryImages = [
-    "/VinhHaLongBG.jpeg",
-    "/VinhHaLong.jpeg",
-    "/halong.jpeg",
-    "/hoian.jpeg",
-    "/cauvan.jpeg",
-    "/phongnha.jpeg",
-  ];
-  
-
-  let galleryImages: string[] = defaultGalleryImages;
-  if (tour.images && Array.isArray(tour.images) && tour.images.length > 0) {
-    // Đưa ảnh chính (is_main) lên đầu, sau đó các ảnh còn lại
-    const mainImg = tour.images.find(img => img.is_main);
-    const otherImgs = tour.images.filter(img => !img.is_main);
-    galleryImages = [
-      ...(mainImg ? [mainImg.image_url] : []),
-      ...otherImgs.map(img => img.image_url)
-    ];
-  }
-
   return (
     <div className="min-h-screen bg-white">
       <Header textColor="black" />
-
       <div className="container mx-auto px-4 py-8 pt-[120px]">
         <button
           className="flex items-center gap-2 mb-6 text-gray-700 hover:text-teal-600 font-medium"
           onClick={() => router.back()}
         >
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           Quay lại
         </button>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -229,6 +201,12 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
             {/* Tour Title */}
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{tour.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || 'Tên tour không có'}</h1>
+              {/* Hiển thị tên agency nếu có */}
+              {tour.agency_name && (
+                <div className="text-sm text-gray-500 mb-2">
+                  Đơn vị tổ chức: <span className="font-semibold text-teal-700">{tour.agency_name}</span>
+                </div>
+              )}
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <div className="flex items-center">
                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 mr-1" />
@@ -278,22 +256,27 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
               </div>
             </div>
 
-            {/* Quick Info */}
+            {/* Quick Info 4 cột */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <Tag className="w-6 h-6 mx-auto mb-2 text-orange-500" />
                 <div className="font-medium">Loại tour</div>
                 <div className="text-sm text-gray-600">
-                  {tourCategories.length > 0 
+                  {tourCategories.length > 0
                     ? tourCategories.map(cat => cat.name || cat.category_name).join(', ')
-                    : (tour.tour_type || 'Không xác định')
-                  }
+                    : (tour.tour_type || 'Không xác định')}
                 </div>
               </div>
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <Users className="w-6 h-6 mx-auto mb-2 text-orange-500" />
                 <div className="font-medium">Số người</div>
-                <div className="text-sm text-gray-600">{tour.min_participants}-{tour.max_participants}</div>
+                <div className="text-sm text-gray-600">Tối thiểu {tour.min_participants || 1} - Tối đa {tour.max_participants || 99}</div>
+                {/* Hiển thị số chỗ còn trống dựa trên availableSlots */}
+                {typeof availableSlots === 'number' ? (
+                  <div className="text-1xl text-teal-600 mt-1">Còn {availableSlots} chỗ</div>
+                ) : (
+                  <div className="text-xs text-red-500 mt-1">Chưa có dữ liệu slot</div>
+                )}
               </div>
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <MapPin className="w-6 h-6 mx-auto mb-2 text-orange-500" />
@@ -303,7 +286,7 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
               <div className="text-center p-4 bg-gray-50 rounded-lg">
                 <Navigation className="w-6 h-6 mx-auto mb-2 text-orange-500" />
                 <div className="font-medium">Khởi hành từ</div>
-                <div className="text-sm text-gray-600">{tour.departure_location}</div>
+                <div className="text-sm text-gray-600">{tour.departure_location || 'Không xác định'}</div>
               </div>
             </div>
 
@@ -378,7 +361,7 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                           {h.ten_phong && <span className="text-gray-600"> - {h.ten_phong}</span>}
                           {h.star_rating && (
                             <span className="text-yellow-500 ml-2">
-                              {Array.from({length: h.star_rating}, (_, i) => '⭐').join('')}
+                              {Array.from({ length: h.star_rating }, (_, i) => '⭐').join('')}
                             </span>
                           )}
                         </li>
@@ -399,14 +382,6 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                 </AccordionItem>
               </Accordion>
             </section>
-
-  
-            {/* <section className="mb-8">
-              <h2 className="text-2xl font-bold mb-4">Địa điểm tập trung</h2>
-              <div className="h-64 bg-gray-200 rounded-lg flex items-center justify-center">
-                <span className="text-gray-500">{tour.departure_location}</span>
-              </div>
-            </section> */}
 
             {/* Reviews */}
             <section className="mb-8">
@@ -464,13 +439,16 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                           const departureDate = new Date(dateObj.departure_date);
                           const today = new Date();
                           today.setHours(0, 0, 0, 0); // Reset time to start of day
-                          return departureDate >= today; // Chỉ hiển thị ngày từ hôm nay trở đi
+                          // Chỉ hiển thị ngày cách hôm nay ít nhất 3 ngày
+                          const diffTime = departureDate.getTime() - today.getTime();
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                          return diffDays >= 3;
                         })
                         .map((dateObj: any) => (
-                        <SelectItem key={dateObj.id || dateObj.departureDates_id} value={dateObj.id || dateObj.departureDates_id}>
-                          {dateObj.departure_date ? new Date(dateObj.departure_date).toLocaleDateString("vi-VN") : ""}
-                        </SelectItem>
-                      ))}
+                          <SelectItem key={dateObj.id || dateObj.departureDates_id} value={dateObj.id || dateObj.departureDates_id}>
+                            {dateObj.departure_date ? new Date(dateObj.departure_date).toLocaleDateString("vi-VN") : ""}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -482,22 +460,22 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                     <div>
                       <label className="block text-sm text-gray-600 mb-2">Người lớn</label>
                       <div className="flex items-center justify-between bg-gray-50 border border-gray-300 rounded-md px-3 py-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0 hover:bg-gray-200" 
-                          onClick={() => handleChangeAdults(-1)} 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-200"
+                          onClick={() => handleChangeAdults(-1)}
                           disabled={adults <= 1}
                         >
                           -
                         </Button>
                         <span className="font-medium">{adults}</span>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0 hover:bg-gray-200" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-200"
                           onClick={() => handleChangeAdults(1)}
-                          disabled={tour.max_participants && adults >= tour.max_participants}
+                          disabled={availableSlots !== null && availableSlots > 0 && (adults + children) >= availableSlots}
                         >
                           +
                         </Button>
@@ -506,22 +484,22 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                     <div>
                       <label className="block text-sm text-gray-600 mb-2">Trẻ em</label>
                       <div className="flex items-center justify-between bg-gray-50 border border-gray-300 rounded-md px-3 py-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0 hover:bg-gray-200" 
-                          onClick={() => handleChangeChildren(-1)} 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-200"
+                          onClick={() => handleChangeChildren(-1)}
                           disabled={children <= 0}
                         >
                           -
                         </Button>
                         <span className="font-medium">{children}</span>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0 hover:bg-gray-200" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-200"
                           onClick={() => handleChangeChildren(1)}
-                          disabled={tour.max_participants && (adults + children) >= tour.max_participants}
+                          disabled={availableSlots !== null && availableSlots > 0 && (adults + children) >= availableSlots}
                         >
                           +
                         </Button>
@@ -545,14 +523,21 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                   {selectedDepartureDateId === "" && (
                     <div className="text-red-500 text-sm mb-2">Vui lòng chọn ngày khởi hành trước khi đặt tour.</div>
                   )}
-                  {tour.min_participants && (adults + children) < tour.min_participants && (
+                  {/* Không cần kiểm tra số lượng người tối thiểu */}
+                  {availableSlots !== null && availableSlots > 0 && (adults + children) > availableSlots && (
                     <div className="text-red-500 text-sm mb-2">
-                      Số lượng người tối thiểu là {tour.min_participants} người.
+                      Chỉ còn {availableSlots} chỗ trống cho ngày khởi hành này.
                     </div>
                   )}
-                  {tour.max_participants && (adults + children) > tour.max_participants && (
+                  {selectedDepartureDateId && availableSlots !== null && availableSlots === 0 && (
                     <div className="text-red-500 text-sm mb-2">
-                      Số lượng người không được vượt quá {tour.max_participants} người.
+                      Tour này đã hết chỗ cho ngày khởi hành đã chọn.
+                    </div>
+                  )}
+                  {/* Show available_slots for selected date */}
+                  {selectedDepartureDateId && availableSlots !== null && (
+                    <div className="text-sm text-gray-500 mb-2">
+                      Số chỗ còn lại cho ngày này: <span className="font-semibold text-teal-600">{availableSlots}</span>
                     </div>
                   )}
                   <Button
@@ -562,19 +547,21 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                         alert('Vui lòng chọn ngày khởi hành');
                         return;
                       }
-                      if (tour.min_participants && (adults + children) < tour.min_participants) {
-                        alert(`Số lượng người tối thiểu là ${tour.min_participants} người`);
+                      if (availableSlots !== null && availableSlots > 0 && (adults + children) > availableSlots) {
+                        alert(`Chỉ còn ${availableSlots} chỗ trống cho ngày khởi hành này`);
                         return;
                       }
-                      if (tour.max_participants && (adults + children) > tour.max_participants) {
-                        alert(`Số lượng người không được vượt quá ${tour.max_participants} người`);
+                      if (selectedDepartureDateId && availableSlots !== null && availableSlots === 0) {
+                        alert('Tour này đã hết chỗ cho ngày khởi hành đã chọn');
                         return;
                       }
                       handleBookTour();
                     }}
-                    disabled={!selectedDepartureDateId || 
-                             (tour.min_participants && (adults + children) < tour.min_participants) ||
-                             (tour.max_participants && (adults + children) > tour.max_participants)}
+                    disabled={
+                      !Boolean(selectedDepartureDateId) ||
+                      (availableSlots !== null && availableSlots === 0 && Boolean(selectedDepartureDateId)) ||
+                      (availableSlots !== null && availableSlots > 0 && (adults + children) > availableSlots)
+                    }
                   >
                     Xác nhận đặt tour
                   </Button>
@@ -584,7 +571,6 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
           </div>
         </div>
       </div>
-
       <Footer />
     </div>
   );

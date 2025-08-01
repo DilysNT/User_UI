@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Testing API Response</h1>
+    <div id="output"></div>
+    
+    <script>
+        async function testAPI() {
+            try {
+                console.log('Testing /api/tours...');
+                const response = await fetch('http://localhost:5000/api/tours');
+                const data = await response.json();
+                
+                document.getElementById('output').innerHTML = `
+                    <h2>API Tours Response:</h2>
+                    <p><strong>Type:</strong> ${typeof data}</p>
+                    <p><strong>Is Array:</strong> ${Array.isArray(data)}</p>
+                    <p><strong>Keys:</strong> ${typeof data === 'object' ? Object.keys(data).join(', ') : 'N/A'}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                console.log('API Response:', data);
+            } catch (error) {
+                document.getElementById('output').innerHTML = `
+                    <h2>Error:</h2>
+                    <p>${error.message}</p>
+                `;
+                console.error('Error:', error);
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html>

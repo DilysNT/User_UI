@@ -20,15 +20,15 @@ export default function FeaturedDestinations() {
   const selectedDestination = selectedIdx !== null ? destinations[selectedIdx] : null;
 
   return (
-    <section className="pt-[120px] pb-20 bg-gray-50">
+    <section className="pt-8 pb-20 bg-gray-50">
       <div className="container mx-auto px-6">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 mb-2">Điểm đến nổi bật</h2>
+          <h2 className="text-4xl font-bold text-gray-800 mb-2">Địa điểm nổi bật</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">Khám phá những nơi tuyệt vời</p>
         </div>
         {/* Destination Cards Slider */}
         {destinations.length === 0 ? (
-          <div className="text-center text-gray-400 py-20 text-xl">Không có điểm đến nổi bật</div>
+          <div className="text-center text-gray-400 py-20 text-xl">Không có địa điểm nổi bật</div>
         ) : (
           <div className="flex flex-row gap-6 justify-center items-end overflow-x-auto pb-6 no-scrollbar">
             {destinations.map((destination, idx) => (
@@ -40,8 +40,8 @@ export default function FeaturedDestinations() {
               >
                 {/* Ảnh nền */}
                 <div className="absolute inset-0 w-full h-full rounded-3xl overflow-hidden">
-                  {destination.image_url ? (
-                    <img src={destination.image_url} alt={destination.name} className="object-cover w-full h-full" />
+                  {destination.image ? (
+                    <img src={destination.image} alt={destination.name} className="object-cover w-full h-full" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-b from-gray-300 to-gray-100" />
                   )}

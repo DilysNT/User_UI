@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 New SALE-Style Promo Cards Design</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { background: white; border-radius: 12px; padding: 24px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .promo-card { 
+            border-radius: 8px; 
+            overflow: hidden; 
+            margin: 10px; 
+            max-width: 100%; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .promo-card:hover { transform: scale(1.02); }
+        .promo-layout { 
+            display: flex; 
+            align-items: stretch; 
+        }
+        .promo-header { 
+            background: linear-gradient(135deg, #f97316, #ea580c, #dc2626); 
+            padding: 24px; 
+            text-align: center; 
+            color: white; 
+            position: relative;
+            flex-shrink: 0;
+            width: 200px;
+        }
+        .promo-content { 
+            background: linear-gradient(to bottom, white, #fed7aa20); 
+            padding: 20px; 
+            flex: 1;
+        }
+        .discount-text { font-size: 28px; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .off-text { font-size: 14px; font-weight: bold; letter-spacing: 2px; opacity: 0.9; }
+        .code-display { 
+            background: linear-gradient(to right, #fed7aa, #fdba74); 
+            border: 2px dashed #f97316; 
+            padding: 6px 12px; 
+            border-radius: 8px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #c2410c;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+        .sale-pattern { 
+            position: absolute; 
+            inset: 0; 
+            opacity: 0.05; 
+            transform: rotate(12deg) scale(1.5); 
+            font-size: 10px; 
+            font-weight: bold; 
+            color: #f97316;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            margin-top: 32px;
+        }
+        .btn-copy { 
+            background: #f97316; 
+            color: white; 
+            padding: 8px 16px; 
+            border-radius: 8px; 
+            font-weight: 500; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        .btn-copy:hover { background: #ea580c; }
+        .content-flex { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-top: 12px; 
+        }
+        .decorative-circle { 
+            position: absolute; 
+            border: 2px solid rgba(255,255,255,0.3); 
+            border-radius: 50%; 
+        }
+        .circle-1 { top: 8px; left: 8px; width: 24px; height: 24px; }
+        .circle-2 { top: 8px; right: 8px; width: 16px; height: 16px; }
+        .circle-3 { bottom: 8px; left: 12px; width: 12px; height: 12px; }
+        .circle-4 { bottom: 8px; right: 12px; width: 20px; height: 20px; }
+        .time-badge { 
+            background: #fed7aa; 
+            color: #c2410c; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: 500; 
+            display: inline-block;
+            margin: 8px 0;
+        }
+        .highlight { background: #fef3c7; padding: 2px 4px; border-radius: 4px; font-weight: bold; }
+        .success { background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .grid-2 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .rectangular-card { max-width: 600px; margin: 0 auto; }
+        h3 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 New SALE-Style Promo Cards Design</h1>
+        
+        <div class="section">
+            <h2>📋 Design Overview:</h2>
+            <div class="success">
+                <h3>✅ Features đã implement:</h3>
+                <ul>
+                    <li><strong>Rectangular Layout:</strong> Horizontal card design thay vì vertical</li>
+                    <li><strong>Simplified Actions:</strong> Chỉ có nút "Sao chép", xóa nút "Sử dụng ngay"</li>
+                    <li><strong>Compact Design:</strong> Discount và content hiển thị cùng hàng</li>
+                    <li><strong>Enhanced Code Display:</strong> Dashed border với gradient background</li>
+                    <li><strong>Hover Effects:</strong> Subtle scale transform</li>
+                    <li><strong>Data Structure:</strong> Giữ nguyên API response format</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 API Data Structure (Unchanged):</h2>
+            <div style="background: #1f2937; color: #f9fafb; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px;">
+<pre>GET http://localhost:5000/api/promotions
+[
+  {
+    "id": "6ebd5e55-47b6-48de-b0ae-b33d5a6f5d9e",
+    "code": "JULY2507",
+    "description": "Giảm giá cuối tháng cho các du khách vừa hết tiền lương",
+    "discount_amount": "500000.00",
+    "start_date": "2025-07-19T00:00:00.000Z",
+    "end_date": "2025-08-01T00:00:00.000Z",
+    "created_at": "2025-07-19T10:19:44.000Z",
+    "updated_at": "2025-07-19T10:31:14.000Z"
+  },
+  {
+    "id": "promo-summer-2025",
+    "code": "SUMMER2025", 
+    "description": "Giảm giá 10% cho tất cả các tour khởi hành trong tháng 7 và 8.",
+    "discount_amount": "10.00",
+    "start_date": "2025-07-01T00:00:00.000Z",
+    "end_date": "2025-08-31T00:00:00.000Z",
+    "created_at": "2025-06-15T09:00:00.000Z",
+    "updated_at": "2025-07-19T11:46:18.000Z"
+  }
+]</pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎨 New Rectangular Design Preview:</h2>
+            
+            <div class="grid-2">
+                <div class="rectangular-card">
+                    <h3>Card 1: Fixed Amount Discount</h3>
+                    <div class="promo-card">
+                        <div class="promo-layout">
+                            <div class="promo-header">
+                                <div class="sale-pattern">
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                </div>
+                                <div class="decorative-circle circle-1"></div>
+                                <div class="decorative-circle circle-2"></div>
+                                <div class="decorative-circle circle-3"></div>
+                                <div class="decorative-circle circle-4"></div>
+                                <div style="position: relative; z-index: 10;">
+                                    <div class="discount-text">500.000₫</div>
+                                    <div class="off-text">OFF</div>
+                                </div>
+                            </div>
+                            <div class="promo-content">
+                                <div class="code-display">JULY2507</div>
+                                <p style="color: #374151; margin: 0 0 12px 0; font-size: 14px; line-height: 1.4;">
+                                    Giảm giá cuối tháng cho các du khách vừa hết tiền lương
+                                </p>
+                                <div class="content-flex">
+                                    <div class="time-badge">⏰ Còn 10 ngày</div>
+                                    <button class="btn-copy">
+                                        📋 Sao chép
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="rectangular-card">
+                    <h3>Card 2: Percentage Discount</h3>
+                    <div class="promo-card">
+                        <div class="promo-layout">
+                            <div class="promo-header">
+                                <div class="sale-pattern">
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                    <div>SALE</div><div>SALE</div><div>SALE</div><div>SALE</div>
+                                </div>
+                                <div class="decorative-circle circle-1"></div>
+                                <div class="decorative-circle circle-2"></div>
+                                <div class="decorative-circle circle-3"></div>
+                                <div class="decorative-circle circle-4"></div>
+                                <div style="position: relative; z-index: 10;">
+                                    <div class="discount-text">10%</div>
+                                    <div class="off-text">OFF</div>
+                                </div>
+                            </div>
+                            <div class="promo-content">
+                                <div class="code-display">SUMMER2025</div>
+                                <p style="color: #374151; margin: 0 0 12px 0; font-size: 14px; line-height: 1.4;">
+                                    Giảm giá 10% cho tất cả các tour khởi hành trong tháng 7 và 8
+                                </p>
+                                <div class="content-flex">
+                                    <div class="time-badge">⏰ Còn 40 ngày</div>
+                                    <button class="btn-copy">
+                                        📋 Sao chép
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🛠️ Technical Implementation:</h2>
+            
+            <h3>📁 CSS Classes & Structure:</h3>
+            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <ul>
+                    <li><strong>Container:</strong> <code>grid grid-cols-1 md:grid-cols-2 gap-6</code></li>
+                    <li><strong>Card Base:</strong> <code>rounded-lg shadow-lg hover:shadow-xl transform hover:scale-102</code></li>
+                    <li><strong>Layout:</strong> <code>flex items-center</code> (horizontal layout)</li>
+                    <li><strong>Header:</strong> <code>bg-gradient-to-br from-orange-500 via-orange-600 to-red-500</code></li>
+                    <li><strong>Copy Button:</strong> Orange background với hover effects</li>
+                    <li><strong>Removed:</strong> "Sử dụng ngay" button đã được xóa</li>
+                </ul>
+            </div>
+            
+            <h3>📊 Data Processing Logic:</h3>
+            <div style="background: #1f2937; color: #f9fafb; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px;">
+<pre>// Transform API data to component format (UNCHANGED)
+const transformedPromoCodes = data.map(promo => {
+  const discountAmount = parseFloat(promo.discount_amount);
+  const isPercentage = discountAmount <= 100; // Logic giữ nguyên
+  
+  return {
+    id: promo.id,
+    code: promo.code,
+    description: promo.description,
+    discountAmount: discountAmount,
+    isPercentage: isPercentage,
+    expiresAt: promo.end_date,
+    isActive: new Date(promo.end_date) > new Date()
+  };
+});
+
+// Format discount display (UNCHANGED)
+const formatDiscount = (amount, isPercentage) => {
+  if (isPercentage) {
+    return `${amount}%`;  // SUMMER2025 → "10%"
+  } else {
+    return `${amount.toLocaleString('vi-VN')}₫`; // JULY2507 → "500.000₫"
+  }
+};</pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎨 Design Elements Breakdown:</h2>
+            
+            <div class="grid-2">
+                <div>
+                    <h3>🌈 Color Palette:</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0;">
+                        <div style="background: #f97316; color: white; padding: 8px; border-radius: 4px; text-align: center; font-size: 12px;">Orange 500</div>
+                        <div style="background: #ea580c; color: white; padding: 8px; border-radius: 4px; text-align: center; font-size: 12px;">Orange 600</div>
+                        <div style="background: #dc2626; color: white; padding: 8px; border-radius: 4px; text-align: center; font-size: 12px;">Red 600</div>
+                        <div style="background: #fed7aa; color: #c2410c; padding: 8px; border-radius: 4px; text-align: center; font-size: 12px;">Orange 200</div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3>✨ Animation Effects:</h3>
+                    <ul style="font-size: 14px;">
+                        <li><strong>Hover Scale:</strong> <code>transform: scale(1.05)</code></li>
+                        <li><strong>Shadow Transition:</strong> <code>shadow-xl → shadow-2xl</code></li>
+                        <li><strong>Button Hover:</strong> Gradient shift + scale</li>
+                        <li><strong>Smooth Transitions:</strong> <code>duration-300</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📱 Responsive Design:</h2>
+            
+            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <ul>
+                    <li><strong>Mobile (< 768px):</strong> 1 card per row</li>
+                    <li><strong>Tablet (768px+):</strong> 2 cards per row</li>
+                    <li><strong>Desktop:</strong> 2 cards per row (max-width: 600px mỗi card)</li>
+                    <li><strong>Horizontal Layout:</strong> Discount bên trái, content bên phải</li>
+                    <li><strong>Compact Design:</strong> Tối ưu không gian hiển thị</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎉 Result Summary:</h2>
+            
+            <div class="success">
+                <h3>✅ Completed Features:</h3>
+                <ul>
+                    <li>🎨 <strong>Rectangular Design:</strong> Horizontal layout thay vì vertical cards</li>
+                    <li>🌈 <strong>Enhanced Gradients:</strong> Multi-stop gradients từ orange sang red</li>
+                    <li>💫 <strong>Simplified Actions:</strong> Chỉ có nút "Sao chép", xóa "Sử dụng ngay"</li>
+                    <li>📱 <strong>Responsive Grid:</strong> 2-column adaptive layout</li>
+                    <li>🎯 <strong>Functional Copy Button:</strong> Improved copy functionality</li>
+                    <li>📊 <strong>Data Compatibility:</strong> 100% tương thích với existing API</li>
+                    <li>⚡ <strong>Performance:</strong> CSS-only animations, không impact performance</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

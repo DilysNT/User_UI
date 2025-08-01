@@ -45,7 +45,7 @@ export default function Header({ textColor = "white" }: HeaderProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
-      console.log('Header: token in localStorage:', token);
+      console.log('Header: token in localStorage:', !!token ? 'exists' : 'null');
       if (!token) {
         setUser(null);
         localStorage.removeItem('user');
@@ -56,18 +56,28 @@ export default function Header({ textColor = "white" }: HeaderProps) {
       })
         .then(res => {
           console.log('Header: /api/auth/me status:', res.status);
+          if (res.status === 401) {
+            // Token hết hạn hoặc không hợp lệ
+            console.log('Header: Token expired or invalid, clearing auth data');
+            setUser(null);
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            return null;
+          }
           if (!res.ok) throw new Error('Fetch user failed');
           return res.json();
         })
         .then(data => {
-          // Nếu data.user không có, thử setUser(data)
-          const userObj = data.user || data;
-          console.log('Header: fetched user:', userObj);
-          setUser(userObj);
-          localStorage.setItem('user', JSON.stringify(userObj));
+          if (data) {
+            // Nếu data.user không có, thử setUser(data)
+            const userObj = data.user || data;
+            console.log('Header: fetched user successfully');
+            setUser(userObj);
+            localStorage.setItem('user', JSON.stringify(userObj));
+          }
         })
         .catch((err) => {
-          console.error('Header: user fetch error:', err);
+          console.error('Header: user fetch error:', err.message);
           setUser(null);
           localStorage.removeItem('user');
           localStorage.removeItem('token');

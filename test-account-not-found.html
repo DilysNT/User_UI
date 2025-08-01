@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo: Tài khoản không tồn tại</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .demo-card { background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .login-form { max-width: 400px; margin: 0 auto; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
+        button { width: 100%; padding: 12px; background: #14b8a6; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 8px 0; }
+        button:hover { background: #0f766e; }
+        .error { color: #ef4444; text-align: center; margin: 10px 0; font-size: 14px; }
+        .success { color: #10b981; text-align: center; margin: 10px 0; font-size: 14px; }
+        
+        /* Account Not Found Component Styles */
+        .account-not-found {
+            background: #fffbeb;
+            border: 1px solid #fed7aa;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            display: none;
+        }
+        .account-not-found.show { display: block; }
+        .account-not-found .header { display: flex; align-items: start; }
+        .account-not-found .icon { flex-shrink: 0; margin-right: 12px; color: #f59e0b; }
+        .account-not-found .content { flex: 1; }
+        .account-not-found h3 { margin: 0 0 8px 0; color: #92400e; font-size: 14px; font-weight: 600; }
+        .account-not-found p { margin: 0 0 12px 0; color: #92400e; font-size: 14px; }
+        .account-not-found .email { font-weight: bold; }
+        .account-not-found .actions { display: flex; flex-direction: column; gap: 8px; }
+        .account-not-found .actions button { margin: 0; padding: 8px 12px; font-size: 14px; }
+        .btn-primary { background: #14b8a6; }
+        .btn-primary:hover { background: #0f766e; }
+        .btn-secondary { background: white; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #f9fafb; }
+        
+        @media (min-width: 640px) {
+            .account-not-found .actions { flex-direction: row; }
+        }
+        
+        .feature-list { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px 0; }
+        .feature-list h4 { margin: 0 0 12px 0; color: #166534; }
+        .feature-list ul { margin: 0; padding-left: 20px; color: #166534; }
+        .feature-list li { margin: 4px 0; }
+        
+        .demo-scenarios { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin: 20px 0; }
+        .scenario { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+        .scenario h4 { margin: 0 0 8px 0; color: #1e293b; }
+        .scenario p { margin: 0 0 12px 0; color: #64748b; font-size: 14px; }
+        .scenario button { background: #3b82f6; font-size: 14px; }
+        .scenario button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Demo: Xử lý tài khoản không tồn tại</h1>
+        
+        <div class="demo-card">
+            <h2>📋 Tính năng đã implement:</h2>
+            <div class="feature-list">
+                <h4>✅ Các cải tiến:</h4>
+                <ul>
+                    <li><strong>Phát hiện tài khoản không tồn tại:</strong> API response status 404 hoặc message chứa "not found"</li>
+                    <li><strong>Thông báo tiếng Việt:</strong> Hiển thị email cụ thể không tồn tại</li>
+                    <li><strong>UI thân thiện:</strong> Component warning với icon và styling chuyên nghiệp</li>
+                    <li><strong>Gợi ý tạo tài khoản:</strong> Button trực tiếp đến form đăng ký</li>
+                    <li><strong>Xử lý lỗi chi tiết:</strong> Phân biệt lỗi password sai vs tài khoản không tồn tại</li>
+                    <li><strong>UX tốt:</strong> Có thể thử email khác hoặc tạo tài khoản mới</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-card">
+            <h2>🎯 Demo Login Form</h2>
+            <div class="login-form">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <h3 style="margin: 0 0 8px 0; color: #1f2937;">Đăng Nhập</h3>
+                    <p style="margin: 0; color: #6b7280; font-size: 14px;">Chào mừng bạn quay trở lại!</p>
+                </div>
+                
+                <form id="demoLoginForm">
+                    <input type="email" id="email" placeholder="Email" value="" />
+                    <input type="password" id="password" placeholder="Mật khẩu" value="123456" />
+                    
+                    <div id="error-message" class="error"></div>
+                    <div id="success-message" class="success"></div>
+                    
+                    <!-- Account Not Found Component -->
+                    <div id="account-not-found" class="account-not-found">
+                        <div class="header">
+                            <div class="icon">
+                                <svg style="width: 20px; height: 20px;" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="content">
+                                <h3>Tài khoản không tồn tại</h3>
+                                <p>Email <span id="not-found-email" class="email"></span> chưa được đăng ký trong hệ thống.</p>
+                                <div class="actions">
+                                    <button type="button" class="btn-primary" onclick="goToRegister()">
+                                        ➕ Tạo tài khoản mới
+                                    </button>
+                                    <button type="button" class="btn-secondary" onclick="hideAccountNotFound()">
+                                        Thử email khác
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit">Đăng Nhập</button>
+                </form>
+                
+                <div style="text-align: center; margin-top: 12px;">
+                    <span style="color: #6b7280; font-size: 12px;">Chưa có tài khoản? </span>
+                    <button type="button" style="background: none; border: none; color: #14b8a6; text-decoration: underline; font-size: 14px; cursor: pointer;" onclick="showRegisterModal()">
+                        Tạo tài khoản
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-card">
+            <h2>🧪 Test Scenarios</h2>
+            <div class="demo-scenarios">
+                <div class="scenario">
+                    <h4>📧 Email không tồn tại</h4>
+                    <p>Test với email chưa đăng ký</p>
+                    <button onclick="testScenario('notexist@example.com')">Test Email Không Tồn Tại</button>
+                </div>
+                
+                <div class="scenario">
+                    <h4>🔑 Mật khẩu sai</h4>
+                    <p>Test với email tồn tại nhưng mật khẩu sai</p>
+                    <button onclick="testScenario('user@example.com', 'wrongpass')">Test Mật Khẩu Sai</button>
+                </div>
+                
+                <div class="scenario">
+                    <h4>🌐 Lỗi mạng</h4>
+                    <p>Test khi không kết nối được server</p>
+                    <button onclick="testNetworkError()">Test Lỗi Mạng</button>
+                </div>
+                
+                <div class="scenario">
+                    <h4>✅ Đăng nhập thành công</h4>
+                    <p>Test với thông tin đúng</p>
+                    <button onclick="testScenario('user@example.com', '123456')">Test Thành Công</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-card">
+            <h2>💻 Implementation Code</h2>
+            <div style="background: #1f2937; color: #f9fafb; padding: 16px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; overflow-x: auto;">
+// Auth.tsx - handleLogin function
+const handleLogin = async (e: React.FormEvent) => {
+  // ... validation code ...
+  
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      // ✅ Xử lý tài khoản không tồn tại
+      if (res.status === 404 || 
+          data.message?.includes('not found') || 
+          data.message?.includes('không tồn tại')) {
+        setNotFoundEmail(loginData.email);
+        setShowAccountNotFound(true);
+      } 
+      // ✅ Xử lý mật khẩu sai
+      else if (res.status === 401 || 
+               data.message?.includes('password')) {
+        setLoginError("Mật khẩu không chính xác...");
+      } 
+      // ✅ Xử lý lỗi khác
+      else {
+        setLoginError(data.message || "Đăng nhập thất bại.");
+      }
+    } else {
+      // ✅ Đăng nhập thành công
+      setLoginSuccess("Đăng nhập thành công!");
+      // ... redirect logic ...
+    }
+  } catch (err) {
+    // ✅ Xử lý lỗi kết nối
+    setLoginError("Lỗi kết nối máy chủ...");
+  }
+};
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Form submission handler
+        document.getElementById('demoLoginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            clearMessages();
+            
+            if (!email || !password) {
+                showError('Vui lòng nhập email và mật khẩu.');
+                return;
+            }
+            
+            // Simulate API call
+            simulateLogin(email, password);
+        });
+        
+        function simulateLogin(email, password) {
+            // Clear previous messages
+            clearMessages();
+            
+            // Simulate different scenarios based on email
+            setTimeout(() => {
+                if (email.includes('notexist') || email === 'test@notfound.com') {
+                    // Account not found
+                    showAccountNotFound(email);
+                } else if (password === 'wrongpass') {
+                    // Wrong password
+                    showError('Mật khẩu không chính xác. Vui lòng thử lại hoặc sử dụng "Quên mật khẩu".');
+                } else if (email === 'user@example.com' && password === '123456') {
+                    // Success
+                    showSuccess('Đăng nhập thành công!');
+                    setTimeout(() => {
+                        alert('Chuyển hướng về trang chủ...');
+                    }, 1000);
+                } else {
+                    // Generic error
+                    showError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+                }
+            }, 500);
+        }
+        
+        function testScenario(email, password = '123456') {
+            document.getElementById('email').value = email;
+            document.getElementById('password').value = password;
+            simulateLogin(email, password);
+        }
+        
+        function testNetworkError() {
+            clearMessages();
+            showError('Lỗi kết nối máy chủ. Vui lòng kiểm tra kết nối internet và thử lại.');
+        }
+        
+        function showAccountNotFound(email) {
+            document.getElementById('not-found-email').textContent = email;
+            document.getElementById('account-not-found').classList.add('show');
+        }
+        
+        function hideAccountNotFound() {
+            document.getElementById('account-not-found').classList.remove('show');
+        }
+        
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+        }
+        
+        function showSuccess(message) {
+            document.getElementById('success-message').textContent = message;
+        }
+        
+        function clearMessages() {
+            document.getElementById('error-message').textContent = '';
+            document.getElementById('success-message').textContent = '';
+            hideAccountNotFound();
+        }
+        
+        function goToRegister() {
+            alert('Chuyển đến trang đăng ký với email: ' + document.getElementById('not-found-email').textContent);
+            hideAccountNotFound();
+        }
+        
+        function showRegisterModal() {
+            alert('Hiển thị modal chọn loại tài khoản (Khách hàng / Doanh nghiệp)');
+        }
+    </script>
+</body>
+</html>

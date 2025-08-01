@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Notification Dialog</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .test-btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .success-btn {
+            background: #10b981;
+            color: white;
+        }
+        .error-btn {
+            background: #ef4444;
+            color: white;
+        }
+        .warning-btn {
+            background: #f59e0b;
+            color: white;
+        }
+        .info-btn {
+            background: #3b82f6;
+            color: white;
+        }
+        .confirm-btn {
+            background: #8b5cf6;
+            color: white;
+        }
+        .description {
+            background: #f8f9fa;
+            border-left: 4px solid #6366f1;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 0 8px 8px 0;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #e0f2fe;
+            border-left: 4px solid #0891b2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Test Notification Dialog System</h1>
+        
+        <div class="test-buttons">
+            <button class="test-btn success-btn" onclick="testSuccess()">
+                ✅ Success Notification
+            </button>
+            
+            <button class="test-btn error-btn" onclick="testError()">
+                ❌ Error Notification
+            </button>
+            
+            <button class="test-btn warning-btn" onclick="testWarning()">
+                ⚠️ Warning Notification
+            </button>
+            
+            <button class="test-btn info-btn" onclick="testInfo()">
+                ℹ️ Info Notification
+            </button>
+            
+            <button class="test-btn confirm-btn" onclick="testConfirmation()">
+                🤔 Confirmation Dialog
+            </button>
+        </div>
+
+        <div class="description">
+            <h3>📋 Về Notification Dialog System</h3>
+            <p><strong>Chức năng:</strong> Thay thế các alert/confirm mặc định của browser bằng dialog đẹp mắt và tùy chỉnh được.</p>
+            <p><strong>Tính năng:</strong></p>
+            <ul>
+                <li>🎨 Thiết kế đẹp với icon và màu sắc phù hợp cho từng loại thông báo</li>
+                <li>📱 Responsive, hoạt động tốt trên mọi thiết bị</li>
+                <li>🔧 Có thể tùy chỉnh tiêu đề, nội dung, nút bấm</li>
+                <li>✨ Hiệu ứng mượt mà với animation</li>
+                <li>🎯 Hỗ trợ xác nhận với callback function</li>
+            </ul>
+        </div>
+
+        <div class="status">
+            <p><strong>📍 Trạng thái:</strong> Đã tích hợp vào ProfileModal để thay thế tất cả alert/confirm browser mặc định.</p>
+            <p><strong>🚀 Để test:</strong> Truy cập http://localhost:3001 và thử các chức năng trong Profile Modal.</p>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(type, title, message) {
+            // Mô phỏng dialog thông báo
+            const icon = {
+                'success': '✅',
+                'error': '❌', 
+                'warning': '⚠️',
+                'info': 'ℹ️'
+            }[type];
+            
+            alert(`${icon} ${title}\n\n${message}\n\n(Trong ứng dụng thực tế, đây sẽ là dialog đẹp thay vì alert)`);
+        }
+
+        function testSuccess() {
+            showMessage('success', 'Thành công', 'Cập nhật thông tin thành công!');
+        }
+
+        function testError() {
+            showMessage('error', 'Lỗi', 'Mật khẩu hiện tại không đúng!');
+        }
+
+        function testWarning() {
+            showMessage('warning', 'Cảnh báo', 'Mật khẩu mới phải có ít nhất 6 ký tự!');
+        }
+
+        function testInfo() {
+            showMessage('info', 'Thông tin', 'Vui lòng nhập mật khẩu hiện tại để xác nhận thay đổi!');
+        }
+
+        function testConfirmation() {
+            const result = confirm('🤔 Xác nhận hủy tour\n\nBạn có chắc chắn muốn hủy tour "Tour Phú Quốc 3N2Đ"?\n\nLưu ý: Việc hủy tour có thể phát sinh phí hủy theo chính sách của chúng tôi.\n\n(Trong ứng dụng thực tế, đây sẽ là dialog đẹp với nút Hủy tour / Quay lại)');
+            if (result) {
+                showMessage('success', 'Hủy tour thành công', 'Tour của bạn đã được hủy. Chúng tôi sẽ liên hệ với bạn về việc hoàn tiền.');
+            }
+        }
+    </script>
+</body>
+</html>

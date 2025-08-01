@@ -149,6 +149,19 @@ export default function Booking({ params }: { params: { id: string } }) {
           isUserLoggedIn: !!authToken 
         });
 
+        // Auto-apply promo code from public promo section
+        const copiedPromoCode = localStorage.getItem('copiedPromoCode');
+        if (copiedPromoCode && !promoCode) {
+          console.log('🎫 Auto-applying copied promo code:', copiedPromoCode);
+          setPromoCode(copiedPromoCode);
+          // Clear the stored promo code to prevent re-applying
+          localStorage.removeItem('copiedPromoCode');
+          // Auto-apply the promo code
+          setTimeout(() => {
+            handleApplyPromo(copiedPromoCode);
+          }, 1000);
+        }
+
       } catch {
         setTourData({
           id: params.id,
@@ -266,6 +279,32 @@ export default function Booking({ params }: { params: { id: string } }) {
       .catch(() => setDepartureDates([]));
   }, [tourData]);
 
+  // Auto-populate participant info when there's only 1 participant
+  useEffect(() => {
+    if (formData.participants.length === 1 && 
+        (formData.contactInfo.fullName || formData.contactInfo.phone)) {
+      const participant = formData.participants[0];
+      
+      // Only auto-populate if participant fields are empty
+      if (!participant.fullName || !participant.phone) {
+        const updatedParticipants = [...formData.participants];
+        updatedParticipants[0] = {
+          ...participant,
+          fullName: participant.fullName || formData.contactInfo.fullName,
+          phone: participant.phone || formData.contactInfo.phone,
+        };
+        
+        const newFormData = {
+          ...formData,
+          participants: updatedParticipants,
+        };
+        
+        setFormData(newFormData);
+        saveFormDataToStorage(newFormData);
+      }
+    }
+  }, [formData.contactInfo.fullName, formData.contactInfo.phone, formData.participants.length]);
+
   // Auto-save promo data when it changes
   useEffect(() => {
     if (promoCode || discountAmount > 0) {
@@ -298,6 +337,26 @@ export default function Booking({ params }: { params: { id: string } }) {
         [field]: value,
       },
     };
+    
+    // Auto-populate participant info from contact info when only 1 participant
+    if (section === "contactInfo" && formData.participants.length === 1) {
+      const updatedParticipants = [...newFormData.participants];
+      
+      if (field === "fullName" && value.trim()) {
+        updatedParticipants[0] = {
+          ...updatedParticipants[0],
+          fullName: value,
+        };
+      } else if (field === "phone" && value.trim()) {
+        updatedParticipants[0] = {
+          ...updatedParticipants[0],
+          phone: value,
+        };
+      }
+      
+      newFormData.participants = updatedParticipants;
+    }
+    
     setFormData(newFormData);
     saveFormDataToStorage(newFormData);
   }
@@ -338,6 +397,16 @@ export default function Booking({ params }: { params: { id: string } }) {
     if (formData.participants.length > 1) {
       const updatedParticipants = [...formData.participants]
       updatedParticipants.splice(index, 1)
+      
+      // Auto-populate the remaining participant with contact info if only 1 left
+      if (updatedParticipants.length === 1) {
+        updatedParticipants[0] = {
+          ...updatedParticipants[0],
+          fullName: formData.contactInfo.fullName || updatedParticipants[0].fullName,
+          phone: formData.contactInfo.phone || updatedParticipants[0].phone,
+        };
+      }
+      
       const newFormData = {
         ...formData,
         participants: updatedParticipants,
@@ -420,56 +489,77 @@ export default function Booking({ params }: { params: { id: string } }) {
     console.log('🧹 All saved data cleared');
   };
 
-  const handleApplyPromo = async () => {
+  const handleApplyPromo = async (codeToApply?: string) => {
+    const codeToUse = codeToApply || promoCode;
     setPromoError("");
     setPromoDescription("");
     setPromotionId(null);
     setOriginalPrice(null);
     setFinalPrice(null);
-    if (!promoCode.trim()) {
+    if (!codeToUse.trim()) {
       setPromoError("Vui lòng nhập mã giảm giá.");
       return;
     }
     try {
-      // Tính giá gốc theo logic backend: tour.price * (adults + children)
-      const price = tourData.price * (tourData.adults + tourData.children);
+      // Tính giá gốc theo logic mới: người lớn full price, trẻ em 50% price
+      const adultPrice = tourData.price * tourData.adults;
+      const childPrice = tourData.price * 0.5 * tourData.children;
+      const price = adultPrice + childPrice;
+      
       console.log('🧮 Calculating promo for price:', price.toLocaleString("vi-VN") + '₫');
       console.log('📊 Price breakdown:', {
         tourPrice: tourData.price.toLocaleString("vi-VN") + '₫',
         adults: tourData.adults,
         children: tourData.children,
-        totalPeople: tourData.adults + tourData.children,
-        calculatedPrice: price.toLocaleString("vi-VN") + '₫'
+        adultTotalPrice: adultPrice.toLocaleString("vi-VN") + '₫',
+        childTotalPrice: childPrice.toLocaleString("vi-VN") + '₫',
+        childPricePerPerson: (tourData.price * 0.5).toLocaleString("vi-VN") + '₫ (50% giảm)',
+        totalPrice: price.toLocaleString("vi-VN") + '₫'
       });
       
       const res = await fetch("http://localhost:5000/api/bookings/validate-promotion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ promotion_code: promoCode.trim(), tour_price: price }),
+        body: JSON.stringify({ promotion_code: codeToUse.trim(), tour_price: price }),
       });
       
+      let data: any = null;
       if (!res.ok) {
-        setPromoError("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+        // Nếu backend trả về message cụ thể, hiển thị cho user
+        data = await res.json().catch(() => ({}));
+        if (data && typeof data === 'object' && 'message' in data) {
+          setPromoError(data.message);
+        } else {
+          setPromoError("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+        }
         setDiscountAmount(0);
         setPromotionId(null);
         setOriginalPrice(null);
         setFinalPrice(null);
         return;
       }
-      
-      const data = await res.json();
+      data = await res.json();
+      if (!data) {
+        setPromoError("Không thể kiểm tra mã giảm giá. Vui lòng thử lại.");
+        setDiscountAmount(0);
+        setPromotionId(null);
+        setOriginalPrice(null);
+        setFinalPrice(null);
+        return;
+      }
       
       // Debug API response chi tiết
       console.group('🔍 Promotion API Response Debug');
       console.log('Full API Response:', data);
-      console.log('Promotion Object:', data.promotion);
-      console.log('Pricing Object:', data.pricing);
-      console.log('Code:', data.promotion?.code);
-      console.log('Fixed Discount Amount:', data.promotion?.discount_amount);
-      console.log('Discount Percentage:', data.promotion?.discount_percentage);
+      if (data && typeof data === 'object') {
+        console.log('Promotion Object:', data.promotion);
+        console.log('Pricing Object:', data.pricing);
+        console.log('Code:', data.promotion?.code);
+        console.log('Fixed Discount Amount:', data.promotion?.discount_amount);
+        console.log('Discount Percentage:', data.promotion?.discount_percentage);
+      }
       console.groupEnd();
-      
-      if (!data.valid) {
+      if (!data || !data.valid) {
         setPromoError("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
         setDiscountAmount(0);
         setPromotionId(null);
@@ -477,14 +567,11 @@ export default function Booking({ params }: { params: { id: string } }) {
         setFinalPrice(null);
         return;
       }
-      
-      let discountAmount = data.pricing.discount_amount || 0;
-      
+      let discountAmount = data.pricing && data.pricing.discount_amount ? data.pricing.discount_amount : 0;
       // 🔧 LOGIC MỚI: Ưu tiên discount_amount cố định trước, sau đó mới tính từ percentage
       if (data.promotion) {
         // Kiểm tra xem có phải mã giảm cố định không (như JULY2507)
         const hasFixedDiscount = data.promotion.discount_amount && Number(data.promotion.discount_amount) > 0;
-        
         if (hasFixedDiscount) {
           // Mã giảm cố định như JULY2507
           discountAmount = Number(data.promotion.discount_amount);
@@ -496,14 +583,12 @@ export default function Booking({ params }: { params: { id: string } }) {
           // Mã giảm theo phần trăm như SUMMER2025
           const expectedPercent = data.promotion.discount_percentage;
           const expectedDiscount = calculateDiscount(price, expectedPercent);
-          
           console.log('🔍 Percentage Discount Analysis:', {
             apiDiscount: discountAmount,
             expectedPercent: expectedPercent + '%',
             expectedDiscount: expectedDiscount.toLocaleString("vi-VN") + '₫',
             shouldOverride: Math.abs(discountAmount - expectedDiscount) > 100
           });
-          
           // Override nếu chênh lệch quá lớn (> 100₫)
           if (Math.abs(discountAmount - expectedDiscount) > 100) {
             console.warn('⚠️ API discount mismatch, overriding with calculated amount');
@@ -511,27 +596,22 @@ export default function Booking({ params }: { params: { id: string } }) {
           }
         }
       }
-      
       // Đảm bảo discount amount không vượt quá giá gốc
       discountAmount = Math.min(discountAmount, price);
-      
       setDiscountAmount(discountAmount);
-      setPromoDescription(data.promotion.description || "");
-      setPromotionId(data.promotion.id || null);
-      setOriginalPrice(data.pricing.original_price || price);
-      
+      setPromoDescription(data.promotion && data.promotion.description ? data.promotion.description : "");
+      setPromotionId(data.promotion && data.promotion.id ? data.promotion.id : null);
+      setOriginalPrice(data.pricing && data.pricing.original_price ? data.pricing.original_price : price);
       // Tính finalPrice theo logic backend mới: original_price - discountAmount
-      const calculatedFinalPrice = (data.pricing.original_price || price) - discountAmount;
+      const calculatedFinalPrice = (data.pricing && data.pricing.original_price ? data.pricing.original_price : price) - discountAmount;
       setFinalPrice(calculatedFinalPrice);
       setPromoError("");
-      
       console.log('✅ Promo applied:', {
         code: promoCode,
-        originalPrice: (data.pricing.original_price || price).toLocaleString("vi-VN") + '₫',
+        originalPrice: (data.pricing && data.pricing.original_price ? data.pricing.original_price : price).toLocaleString("vi-VN") + '₫',
         discount: discountAmount.toLocaleString("vi-VN") + '₫',
         finalPrice: calculatedFinalPrice.toLocaleString("vi-VN") + '₫'
       });
-      
       // Show success notification
       setPromoSuccessData({
         code: promoCode,
@@ -540,7 +620,6 @@ export default function Booking({ params }: { params: { id: string } }) {
         final: calculatedFinalPrice
       });
       setShowPromoSuccess(true);
-      
       // Auto hide after 5 seconds
       setTimeout(() => {
         setShowPromoSuccess(false);
@@ -575,216 +654,158 @@ export default function Booking({ params }: { params: { id: string } }) {
     }
 
     try {
-      console.group('🚀 Starting Unified Booking Process');
+      console.group('🚀 Starting Payment-First Booking Process');
       console.log('User Type:', isUserLoggedIn ? 'AUTHENTICATED_USER' : 'GUEST_USER');
       console.log('User Info:', isUserLoggedIn ? userInfo : 'N/A (Guest)');
-      console.log('Has Auth Token:', !!localStorage.getItem('authToken'));
-      console.log('Has Token:', !!localStorage.getItem('token'));
-    // 1. Chuẩn bị booking payload theo format mới
-    // Nếu có user đăng nhập, API sẽ tự động lấy user_id từ token
-    // Nếu là guest, API sẽ tự động assign guest user ID
-    
-    // Sử dụng thông tin từ userInfo nếu đã đăng nhập, ngược lại dùng form data
-    const contactInfo = isUserLoggedIn && userInfo ? {
-      fullName: userInfo.name || userInfo.username || formData.contactInfo.fullName,
-      email: userInfo.email,
-      phone: formData.contactInfo.phone,
-      address: formData.contactInfo.address,
-    } : formData.contactInfo;
-    
-    console.log('📧 Contact info for booking:', {
-      isLoggedIn: isUserLoggedIn,
-      fromUserInfo: isUserLoggedIn && userInfo,
-      contactInfo
-    });
-    
-    const guests = [
-      {
-        name: contactInfo.fullName,
-        phone: contactInfo.phone,
-        email: contactInfo.email,
-        cccd: contactInfo.address,
-      }
-    ];
-    // Nếu có thêm người tham gia, bổ sung vào guests
-    if (formData.participants && formData.participants.length > 0) {
-      formData.participants.forEach((p, idx) => {
-        // Bỏ qua người đại diện đã có ở đầu mảng
-        if (idx === 0) return;
-        guests.push({
-          name: p.fullName,
-          phone: p.phone,
-          email: contactInfo.email, // Sử dụng email từ contactInfo đã xử lý
-          cccd: p.idNumber,
-        });
-      });
-    }
-    
-    let bookingPayload: any = {
-      tour_id: tourData.id,
-      departure_date_id: tourData.departure_date_id,
-      number_of_adults: tourData.adults,
-      number_of_children: tourData.children,
-      guests,
-    };
 
-    // ✅ SIMPLIFIED APPROACH: Backend auto-detect user type
-    if (isUserLoggedIn && userInfo && userInfo.id) {
-      // User đã đăng nhập - gửi user_id để link với tài khoản
-      bookingPayload.user_id = userInfo.id;
-      console.log('👤 Authenticated user booking - including user_id:', userInfo.id);
-    } else {
-      // Guest booking - KHÔNG gửi user_id, để backend auto-detect và xử lý
-      console.log('🎫 Guest booking - no user_id sent, backend will auto-detect from missing Authorization header');
-      // Không thêm user_id vào payload
-    }
+      // 1. Chuẩn bị contact info - sử dụng userInfo nếu đã đăng nhập
+      const contactInfo = isUserLoggedIn && userInfo ? {
+        fullName: userInfo.name || userInfo.username || formData.contactInfo.fullName,
+        email: userInfo.email,
+        phone: formData.contactInfo.phone,
+        address: formData.contactInfo.address,
+      } : formData.contactInfo;
 
-    // Tính toán pricing theo logic backend mới
-    const pricingData = calculateBookingData(
-      tourData.price,
-      tourData.adults,
-      tourData.children,
-      finalPrice,
-      discountAmount
-    );
+      console.log('📧 Contact info for booking:', contactInfo);
 
-    // Validate pricing data trước khi gửi
-    const validation = validatePricingData(
-      pricingData.original_price,
-      pricingData.total_price,
-      discountAmount
-    );
-
-    if (!validation.isValid) {
-      alert('Có lỗi trong tính toán giá. Vui lòng thử lại.');
-      return;
-    }
-
-    // Backend sẽ tự tính original_price và discount_amount
-    // Frontend chỉ cần gửi total_price và promotion_id
-    bookingPayload.total_price = pricingData.total_price;
-    
-    // Thêm promotion_id nếu có discount
-    if (promotionId) {
-      bookingPayload.promotion_id = promotionId;
-    }
-
-    // 2. Chuẩn bị headers cho request - hỗ trợ cả user đăng nhập và guest
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json'
-    };
-    
-    // Thêm Authorization header nếu user đã đăng nhập - Kiểm tra cả 2 tên token
-    const authToken = typeof window !== 'undefined' ? 
-      (localStorage.getItem('authToken') || localStorage.getItem('token')) : null;
-
-    console.log('📦 Final Booking Payload:', {
-      ...bookingPayload,
-      hasPromotion: !!promotionId,
-      totalPrice: bookingPayload.total_price,
-      guestCount: bookingPayload.guests.length,
-      userType: isUserLoggedIn ? 'AUTHENTICATED' : 'GUEST',
-      userId: bookingPayload.user_id || 'Not included (Guest auto-detect)',
-      hasUserId: !!bookingPayload.user_id,
-      authorizationHeader: !!authToken ? 'Present' : 'Missing (Guest auto-detect)'
-    });
-    
-    console.log('🔑 Auth token check for request:', { 
-      hasAuthToken: !!localStorage.getItem('authToken'),
-      hasToken: !!localStorage.getItem('token'),
-      willUseToken: !!authToken,
-      isUserLoggedIn
-    });
-    
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
-    
-    // 3. ✅ AUTO-DETECT APPROACH - Backend detects user type automatically
-    // - Authorization header present: Authenticated user (extract user_id from token)
-    // - No Authorization header: Guest user (backend handles guest user creation)
-    // - user_id only included for authenticated users
-    const bookingRes = await fetch('http://localhost:5000/api/bookings', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(bookingPayload)
-    });
-    
-    if (!bookingRes.ok) {
-      const errorData = await bookingRes.json();
-      alert(`Đặt tour thất bại! ${errorData.message || 'Vui lòng thử lại.'}`);
-      return;
-    }
-    
-    // Lưu thông tin booking vào localStorage để dùng cho Payment
-    const bookingResult = await bookingRes.json();
-    
-    // Hiển thị thông báo thành công dựa trên booking type
-    if (bookingResult.bookingType === 'AUTHENTICATED_USER') {
-      console.log('✅ Đặt tour thành công cho tài khoản đã đăng nhập');
-    } else {
-      console.log('✅ Đặt tour thành công cho khách vãng lai');
-    }
-    
-    console.log('📝 Booking result:', {
-      bookingType: bookingResult.bookingType,
-      message: bookingResult.message,
-      bookingId: bookingResult.data?.id
-    });
-    
-    // 3. Tự động tính phí VAT nếu có agency_id (sử dụng booking ID từ response)
-    const bookingId = bookingResult.data?.id || bookingResult.id;
-    if (tourData.agency_id && bookingId) {
-      try {
-        const commissionResult = await calculateBookingCommission(bookingId);
-        if (commissionResult) {
-          saveCommissionTracking(commissionResult);
-          console.log('✅ VAT calculated and saved:', commissionResult);
-          
-          // Hiển thị thông báo thành công (tùy chọn)
-          // alert(`🎉 Phí VAT ${commissionResult.commissionAmount.toLocaleString("vi-VN")}₫ đã được tính cho booking này`);
+      // 2. Chuẩn bị guests list
+      const guests = [
+        {
+          name: contactInfo.fullName,
+          phone: contactInfo.phone,
+          email: contactInfo.email,
+          cccd: contactInfo.address,
         }
-      } catch (error) {
-        console.warn('❌ Failed to calculate VAT:', error);
-        // Không block user experience nếu tính phí VAT thất bại
+      ];
+
+      // Thêm participants nếu có
+      if (formData.participants && formData.participants.length > 0) {
+        formData.participants.forEach((p, idx) => {
+          if (idx === 0) return; // Bỏ qua người đại diện đã có
+          guests.push({
+            name: p.fullName,
+            phone: p.phone,
+            email: contactInfo.email,
+            cccd: p.idNumber,
+          });
+        });
       }
-    }
-    
-    // Chuẩn bị data cho Payment.tsx với pricing đã tính toán
-    const paymentData = {
-      tour: {
-        ...tourData,
-        // Thêm thông tin pricing đã tính toán
-        original_price: pricingData.original_price,
-        total_price: pricingData.total_price,
-        discount_amount: pricingData.calculated_discount,
-        promotion_id: promotionId,
-        promo_description: promoDescription
-      },
-      booking: bookingResult.data || bookingResult // Hỗ trợ cả 2 format response
-    };
-    
-    localStorage.setItem("bookingData", JSON.stringify(paymentData));
-    
-    // Clear saved form data after successful booking
-    localStorage.removeItem('bookingFormData');
-    localStorage.removeItem('bookingPromoData');
-    console.log('🧹 Cleared saved booking data after successful submission');
-    
-    // Chuyển hướng sang trang payment với bookingId vừa tạo
-    const finalBookingId = bookingResult.data?.id || bookingResult.id;
-    router.push(`/tour/${finalBookingId}/payment`);
-    
-    console.groupEnd();
-    
-    } catch (error) {
-      console.error('❌ Booking Error:', error);
-      console.groupEnd();
-      
-      if (error instanceof Error) {
-        alert(`Đặt tour thất bại: ${error.message}`);
+
+      // 3. Tính toán giá trực tiếp để đảm bảo chính xác
+      const calculatedOriginalPrice = tourData.price * (tourData.adults || 1) + (tourData.price * 0.7 * (tourData.children || 0));
+      const calculatedTotalPrice = calculatedOriginalPrice - discountAmount;
+
+      console.log('💰 Booking pricing calculation:', {
+        tourPrice: tourData.price,
+        adults: tourData.adults,
+        children: tourData.children,
+        discountAmount: discountAmount,
+        calculatedOriginalPrice: calculatedOriginalPrice,
+        calculatedTotalPrice: calculatedTotalPrice
+      });
+
+      // 4. Lấy user_id từ JWT token (ưu tiên lấy từ token, fallback guest)
+      let bookingUserId = '3ca8bb89-a406-4deb-96a7-dab4d9be3cc1';
+      let bookingUserType = 'GUEST_USER';
+      let debugToken: string | null = null;
+      if (typeof window !== 'undefined') {
+        debugToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+      }
+      if (debugToken) {
+        try {
+          const payload = JSON.parse(atob(debugToken.split('.')[1]));
+          if (payload && payload.id) {
+            bookingUserId = payload.id;
+            bookingUserType = 'AUTHENTICATED_USER';
+            console.log('✅ Using user_id from JWT:', bookingUserId);
+          } else {
+            console.warn('⚠️ JWT payload has no id, using guest id');
+          }
+        } catch (err) {
+          console.warn('JWT decode failed, fallback to guest id', err);
+        }
       } else {
-        alert('Đặt tour thất bại! Vui lòng thử lại.');
+        console.warn('⚠️ No JWT token found, using guest id');
+      }
+
+      // 5. Chuẩn bị PENDING booking data (chưa tạo booking record)
+      const pendingBookingData = {
+        tour_id: tourData.id,
+        departure_date_id: tourData.departure_date_id,
+        number_of_adults: tourData.adults || 1,
+        number_of_children: tourData.children || 0,
+        number_of_guests: guests.length,
+        guests: guests,
+        special_requests: formData.specialRequests || null,
+        status: 'pending', // Pending cho đến khi thanh toán thành công
+        // Pricing info
+        original_price: calculatedOriginalPrice,
+        total_price: calculatedTotalPrice,
+        discount_amount: discountAmount,
+        promotion_id: promotionId,
+        // User info
+        user_id: bookingUserId,
+        user_type: bookingUserType
+      };
+      console.log('🚩 Booking user_id sent:', bookingUserId, 'user_type:', bookingUserType);
+
+      // 6. Chuẩn bị data cho Payment page (sử dụng lại giá đã tính)
+      const paymentData = {
+        tour: {
+          ...tourData,
+          original_price: calculatedOriginalPrice,
+          total_price: calculatedTotalPrice,
+          discount_amount: discountAmount,
+          promotion_id: promotionId,
+          promo_description: promoDescription,
+          // Đảm bảo có đủ thông tin hiển thị
+          price: tourData.price,
+          adults: tourData.adults || 1,
+          children: tourData.children || 0
+        },
+        pendingBooking: pendingBookingData,
+        isUserLoggedIn,
+        userInfo,
+        authToken: typeof window !== 'undefined' ? 
+          (localStorage.getItem('authToken') || localStorage.getItem('token')) : null
+      };
+
+      // 7. Lưu vào localStorage để Payment page sử dụng - LƯU NHIỀU NƠI
+      localStorage.setItem("paymentData", JSON.stringify(paymentData));
+      localStorage.setItem("pendingPayment", JSON.stringify(paymentData)); // Backup key
+
+      // Lưu riêng pendingBooking để payment-success có thể dùng
+      localStorage.setItem("pendingBookingData", JSON.stringify(pendingBookingData));
+
+      // Update selectedTour với thông tin booking để fallback
+      const updatedTourData = {
+        ...tourData,
+        booking_prepared: true,
+        booking_timestamp: Date.now(),
+        total_calculated_price: calculatedTotalPrice,
+        discount_applied: discountAmount
+      };
+      localStorage.setItem("selectedTour", JSON.stringify(updatedTourData));
+
+      // Clear form data
+      localStorage.removeItem('bookingFormData');
+      localStorage.removeItem('bookingPromoData');
+      console.log('🧹 Saved payment data, cleared form data');
+
+      // 8. Chuyển hướng tới payment TRƯỚC KHI TẠO BOOKING
+      router.push(`/tour/${tourData.id}/payment`);
+
+      console.log('🎯 Redirected to payment page - booking will be created after successful payment');
+      console.groupEnd();
+
+    } catch (error) {
+      console.error('❌ Payment Preparation Error:', error);
+      console.groupEnd();
+
+      if (error instanceof Error) {
+        alert(`Lỗi chuẩn bị thanh toán: ${error.message}`);
+      } else {
+        alert('Có lỗi xảy ra! Vui lòng thử lại.');
       }
     }
   }
@@ -793,19 +814,19 @@ export default function Booking({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-gray-50">
       {/* Promo Success Notification */}
       {showPromoSuccess && promoSuccessData && (
-        <div className="fixed top-4 right-4 z-50 bg-green-50 border border-green-200 rounded-lg p-4 shadow-xl max-w-md animate-slide-in-right">
+        <div className="fixed top-4 right-4 z-50 bg-orange-50 border border-orange-200 rounded-lg p-4 shadow-xl max-w-md animate-slide-in-right">
           <div className="flex items-start">
-            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
+              <CheckCircle className="w-5 h-5 text-orange-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-green-800 mb-2 text-base">
+              <h3 className="font-semibold text-orange-800 mb-2 text-base">
                 Áp dụng mã giảm giá thành công!
               </h3>
-              <div className="text-sm text-green-700 space-y-1.5">
+              <div className="text-sm text-orange-700 space-y-1.5">
                 <div className="flex justify-between items-center">
                   <span>Mã giảm giá:</span>
-                  <span className="font-semibold bg-green-100 px-2 py-0.5 rounded text-green-800">
+                  <span className="font-semibold bg-orange-100 px-2 py-0.5 rounded text-orange-800">
                     {promoSuccessData.code}
                   </span>
                 </div>
@@ -817,22 +838,22 @@ export default function Booking({ params }: { params: { id: string } }) {
                   <span>Giảm giá:</span>
                   <span className="font-semibold text-red-600">-{promoSuccessData.discount.toLocaleString("vi-VN")}₫</span>
                 </div>
-                <div className="flex justify-between border-t border-green-200 pt-2 mt-2">
+                <div className="flex justify-between border-t border-orange-200 pt-2 mt-2">
                   <span className="font-semibold">Thành tiền:</span>
-                  <span className="font-bold text-green-600 text-base">{promoSuccessData.final.toLocaleString("vi-VN")}₫</span>
+                  <span className="font-bold text-orange-600 text-base">{promoSuccessData.final.toLocaleString("vi-VN")}₫</span>
                 </div>
               </div>
             </div>
             <button
               onClick={() => setShowPromoSuccess(false)}
-              className="ml-2 text-green-400 hover:text-green-600 transition-colors p-1 rounded-full hover:bg-green-100"
+              className="ml-2 text-orange-400 hover:text-orange-600 transition-colors p-1 rounded-full hover:bg-orange-100"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
           {/* Progress bar */}
-          <div className="mt-3 w-full bg-green-100 rounded-full h-1">
-            <div className="bg-green-500 h-1 rounded-full animate-pulse" style={{
+          <div className="mt-3 w-full bg-orange-100 rounded-full h-1">
+            <div className="bg-orange-500 h-1 rounded-full animate-pulse" style={{
               animation: 'shrink 5s linear forwards'
             }}></div>
           </div>
@@ -1226,7 +1247,7 @@ export default function Booking({ params }: { params: { id: string } }) {
                       onChange={e => setPromoCode(e.target.value)}
                       className="flex-1"
                     />
-                    <Button type="button" onClick={handleApplyPromo}>Áp dụng</Button>
+                    <Button type="button" onClick={() => handleApplyPromo()}>Áp dụng</Button>
                     {(discountAmount > 0 || promoCode) && (
                       <Button type="button" variant="outline" onClick={clearPromoCode}>Xóa</Button>
                     )}
@@ -1342,7 +1363,8 @@ export default function Booking({ params }: { params: { id: string } }) {
                         <span className="text-sm">Trẻ em:</span>
                         <div className="flex items-center">
                           <span className="font-medium">{tourData.children} x</span>
-                          <span className="ml-1">{tourData.price.toLocaleString("vi-VN")}₫</span>
+                          <span className="ml-1">{(tourData.price * 0.5).toLocaleString("vi-VN")}₫</span>
+                          <span className="text-xs text-green-600 ml-1">(50% giảm)</span>
                         </div>
                       </div>
                     )}
@@ -1354,8 +1376,10 @@ export default function Booking({ params }: { params: { id: string } }) {
                     <span>Tổng cộng:</span>
                     <span className="text-xl text-red-500">
                       {(() => {
-                        // Backend logic: original_price = tour.price * (adults + children)
-                        const basePrice = tourData.price * (tourData.adults + tourData.children);
+                        // Logic mới: người lớn full price, trẻ em 50% price
+                        const adultPrice = tourData.price * tourData.adults;
+                        const childPrice = tourData.price * 0.5 * tourData.children;
+                        const basePrice = adultPrice + childPrice;
                         const total = finalPrice !== null ? finalPrice : basePrice - discountAmount;
                         
                         // Debug log
