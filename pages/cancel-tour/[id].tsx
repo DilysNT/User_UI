@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useRouter } from 'next/router';
 import { ArrowLeft, AlertTriangle, Clock, DollarSign, FileText, HelpCircle, CheckCircle, Loader2, Star, Calendar, CreditCard, User, Phone, MapPin, Tag, Navigation, ChevronRight } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import Head from 'next/head';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,9 +74,13 @@ function CancelTourPage() {
       setError(null);
       // Lấy token và user_id từ local/session storage
       const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : '';
-      const user_id = typeof window !== 'undefined' ? (localStorage.getItem('user_id') || sessionStorage.getItem('user_id')) : '';
-      if (!user_id) {
-        throw new Error('Không tìm thấy user_id, vui lòng đăng nhập lại.');
+      let user_id = '';
+      if (typeof window !== 'undefined') {
+        user_id = localStorage.getItem('user_id') || sessionStorage.getItem('user_id') || '';
+        // Nếu không có user_id thì fallback guest id
+        if (!user_id) {
+          user_id = '3ca8bb89-a406-4deb-96a7-dab4d9be3cc1';
+        }
       }
       // Gọi API lấy danh sách booking theo user_id từ BE (sửa lại endpoint cho đúng)
       const res = await fetch(`http://localhost:5000/api/bookings?user_id=${user_id}`, {
@@ -107,28 +112,52 @@ function CancelTourPage() {
         });
         if (paymentRes.ok) {
           const paymentData = await paymentRes.json();
-          if (Array.isArray(paymentData.data) && paymentData.data.length > 0) {
-            // Ưu tiên lấy payment_method của payment completed gần nhất
-            const completed = paymentData.data.find((p) => p.status === 'completed');
-            paymentMethod = completed?.payment_method || paymentData.data[0].payment_method || '';
+          console.log('API /payments trả về:', paymentData);
+          let paymentsArr = Array.isArray(paymentData) ? paymentData : (Array.isArray(paymentData.data) ? paymentData.data : []);
+          // Lọc đúng payment cho booking hiện tại
+          const filteredPayments = paymentsArr.filter((p) => p.booking_id === found.id);
+          if (filteredPayments.length > 0) {
+            const completed = filteredPayments.find((p) => p.status === 'completed' && p.payment_method);
+            if (completed) paymentMethod = completed.payment_method;
+            else if (filteredPayments[0].payment_method) paymentMethod = filteredPayments[0].payment_method;
+          } else if (paymentData.payment_method) {
+            paymentMethod = paymentData.payment_method;
+          } else if (paymentData.booking && paymentData.booking.payment_method) {
+            paymentMethod = paymentData.booking.payment_method;
           }
+          console.log('Giá trị paymentMethod sau khi xử lý:', paymentMethod);
         }
       } catch (e) {
         // Nếu lỗi thì fallback về payment_method trong booking
-        paymentMethod = found.payment_method || '';
       }
-      if (!paymentMethod) paymentMethod = found.payment_method || '';
+      // Nếu vẫn chưa có paymentMethod, fallback về booking
+      if (!paymentMethod || paymentMethod === '') paymentMethod = found.payment_method || '';
+      console.log('Giá trị paymentMethod cuối cùng (sau fallback):', paymentMethod);
+
+      // Normalize payment method for UI (VNPay, MoMo, ZaloPay, Bank)
+      let displayPaymentMethod = paymentMethod;
+      if (displayPaymentMethod) {
+        if (displayPaymentMethod.toLowerCase() === 'vnpay') displayPaymentMethod = 'VNPay';
+        else if (displayPaymentMethod.toLowerCase() === 'momo') displayPaymentMethod = 'MoMo';
+        else if (displayPaymentMethod.toLowerCase() === 'zalopay') displayPaymentMethod = 'ZaloPay';
+        else if (displayPaymentMethod.toLowerCase().includes('bank')) displayPaymentMethod = 'Chuyển khoản ngân hàng';
+      } else {
+        displayPaymentMethod = 'Không xác định';
+      }
+      console.log('Giá trị displayPaymentMethod hiển thị:', displayPaymentMethod);
 
       const bookingData: BookingData = {
         id: found.id,
         tour_name: found.tour?.name || found.tour_name || 'Không có tên tour',
         departure_date: found.departureDate?.departure_date || found.departure_date,
         total_price: Number(found.total_price),
-        payment_method: paymentMethod,
+        payment_method: displayPaymentMethod,
         status: found.status || ''
       };
       if (["cancelled", "completed"].includes((bookingData.status || '').toLowerCase())) {
-        throw new Error("Booking này không thể hủy");
+        setError("Booking này không thể hủy");
+        setBooking(null);
+        return;
       }
       setBooking(bookingData);
     } catch (error: any) {
@@ -165,13 +194,21 @@ function CancelTourPage() {
     setError(null);
     try {
       const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : '';
-      const user_id = typeof window !== 'undefined' ? (localStorage.getItem('user_id') || sessionStorage.getItem('user_id')) : '';
+      let user_id = typeof window !== 'undefined' ? (localStorage.getItem('user_id') || sessionStorage.getItem('user_id')) : '';
+      // Fallback to guest id if user_id is missing/null/empty
+      if (!user_id) {
+        user_id = '3ca8bb89-a406-4deb-96a7-dab4d9be3cc1';
+      }
+      // Build headers: only add Authorization if token exists and is non-empty
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token && token.trim().length > 0) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch(`http://localhost:5000/api/cancel-booking/${booking.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
+        headers,
         body: JSON.stringify({ reason: 'Khách muốn hủy tour', user_id })
       });
       const data = await res.json();
@@ -202,10 +239,8 @@ function CancelTourPage() {
       setError('Vui lòng nhập lý do khiếu nại');
       return;
     }
-    
     setLoading(true);
     setError(null);
-    
     try {
       // Mock API call
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -258,33 +293,36 @@ function CancelTourPage() {
 
   // Error state
   if (error && !booking) {
+    // Friendly warning for non-cancellable bookings
     return (
       <>
         <Head>
-          <title>Lỗi | Hủy tour</title>
+          <title>Booking không thể hủy | Hủy tour</title>
         </Head>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center max-w-md mx-4">
-            <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Có lỗi xảy ra</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => router.back()}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-              >
-                Quay lại
-              </button>
-              <button
-                onClick={() => {
-                  setError(null);
-                  fetchBookingData();
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200"
-              >
-                Thử lại
-              </button>
+        <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-yellow-100 to-yellow-50 flex items-center justify-center p-4">
+          <div className="text-center bg-white rounded-2xl p-8 shadow-xl max-w-md w-full">
+            <div className="bg-yellow-100 rounded-full p-4 mx-auto mb-4 w-16 h-16 flex items-center justify-center">
+              <AlertTriangle className="text-yellow-600" size={40} />
             </div>
+            <h2 className="text-xl font-bold mb-2 text-yellow-700">Booking đã hoàn thành hoặc đã hủy</h2>
+            <p className="text-gray-700 mb-6">Bạn không thể hủy booking này. Nếu cần hỗ trợ, vui lòng liên hệ CSKH.</p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left max-w-sm mx-auto">
+              <div className="font-semibold text-yellow-700 mb-2">Thông tin liên hệ CSKH:</div>
+              <div className="flex items-center gap-2 mb-1">
+                <Phone className="w-5 h-5 text-blue-500" />
+                <span className="font-medium text-gray-900">Hotline: <a href="tel:19001234" className="underline text-blue-700">1900 1234</a></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-green-500" />
+                <span className="font-medium text-gray-900">Email: <a href="mailto:support@traveltour.vn" className="underline text-green-700">support@traveltour.vn</a></span>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/profile?tab=bookings')}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200"
+            >
+              Về lịch sử đặt tour
+            </button>
           </div>
         </div>
       </>
@@ -293,44 +331,83 @@ function CancelTourPage() {
 
   // Success state
   if (isSuccess) {
-    // Xác định message và style dựa vào refundStatus và paymentError
-    let title = '';
-    let desc = '';
-    let iconColor = '';
-    let icon: React.ReactNode = null;
-    let bgColor = '';
-    if (refundStatus === 'completed' && !paymentError) {
-      title = 'Hủy tour và hoàn tiền thành công!';
-      desc = 'Yêu cầu hủy tour của bạn đã được xử lý và hoàn tiền thành công. Số tiền sẽ được hoàn lại qua ' + (booking?.payment_method || 'phương thức thanh toán ban đầu') + ' trong vòng 3-7 ngày làm việc.';
-      iconColor = 'text-green-600';
-      bgColor = 'bg-green-100';
-      icon = <CheckCircle className={iconColor} size={32} />;
-    } else if (refundStatus === 'manual_refund_required' || paymentError) {
-      title = 'Hủy tour đã ghi nhận, chờ hoàn tiền';
-      desc = 'Yêu cầu hủy tour đã được ghi nhận. Vui lòng chờ admin xử lý hoàn tiền.';
-      if (paymentError) desc += `\nLý do: ${paymentError}`;
-      iconColor = 'text-yellow-600';
-      bgColor = 'bg-yellow-100';
-      icon = <AlertTriangle className={iconColor} size={32} />;
+    // Xác định message và style dựa vào refundStatus, paymentError, và user_id guest
+    // Lấy user_id hiện tại để xác định guest
+    let user_id = '';
+    if (typeof window !== 'undefined') {
+      user_id = localStorage.getItem('user_id') || sessionStorage.getItem('user_id') || '';
+    }
+    const isGuest = !user_id || user_id === '3ca8bb89-a406-4deb-96a7-dab4d9be3cc1';
+    let statusObj = {
+      title: '',
+      desc: '',
+      iconColor: '',
+      bgColor: '',
+      icon: null as React.ReactNode,
+      showContact: false
+    };
+    if (refundStatus === 'manual_refund_required' || isGuest) {
+      statusObj = {
+        title: 'Hủy tour đã ghi nhận, chờ hoàn tiền',
+        desc: 'Đơn đã được hủy thành công. Tuy nhiên, hệ thống chưa hoàn tiền tự động. Vui lòng liên hệ CSKH để được hỗ trợ hoàn tiền.',
+        iconColor: 'text-yellow-600',
+        bgColor: 'bg-yellow-100',
+        icon: <AlertTriangle className="text-yellow-600" size={32} />, 
+        showContact: true
+      };
+    } else if (refundStatus === 'completed' && !paymentError) {
+      statusObj = {
+        title: 'Hủy tour và hoàn tiền thành công!',
+        desc: 'Yêu cầu hủy tour của bạn đã được xử lý và hoàn tiền thành công. Số tiền sẽ được hoàn lại qua ' + (booking?.payment_method || 'phương thức thanh toán ban đầu') + ' trong vòng 3-7 ngày làm việc.',
+        iconColor: 'text-green-600',
+        bgColor: 'bg-green-100',
+        icon: <CheckCircle className="text-green-600" size={32} />, 
+        showContact: false
+      };
+    } else if (paymentError) {
+      statusObj = {
+        title: 'Hủy tour đã ghi nhận, chờ hoàn tiền',
+        desc: 'Yêu cầu hủy tour đã được ghi nhận. Vui lòng chờ admin xử lý hoàn tiền.\nLý do: ' + paymentError,
+        iconColor: 'text-yellow-600',
+        bgColor: 'bg-yellow-100',
+        icon: <AlertTriangle className="text-yellow-600" size={32} />, 
+        showContact: true
+      };
     } else {
-      title = 'Hủy tour thành công!';
-      desc = 'Yêu cầu hủy tour của bạn đã được xử lý.';
-      iconColor = 'text-green-600';
-      bgColor = 'bg-green-100';
-      icon = <CheckCircle className={iconColor} size={32} />;
+      statusObj = {
+        title: 'Hủy tour thành công!',
+        desc: 'Yêu cầu hủy tour của bạn đã được xử lý.',
+        iconColor: 'text-green-600',
+        bgColor: 'bg-green-100',
+        icon: <CheckCircle className="text-green-600" size={32} />, 
+        showContact: false
+      };
     }
     return (
       <>
         <Head>
-          <title>{title} | {booking?.tour_name}</title>
+          <title>{statusObj.title} | {booking?.tour_name}</title>
         </Head>
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-4">
           <div className="text-center bg-white rounded-2xl p-8 shadow-xl max-w-md w-full">
-            <div className={`${bgColor} rounded-full p-4 mx-auto mb-4 w-16 h-16 flex items-center justify-center`}>
-              {icon}
+            <div className={`${statusObj.bgColor} rounded-full p-4 mx-auto mb-4 w-16 h-16 flex items-center justify-center`}>
+              {statusObj.icon}
             </div>
-            <h2 className="text-xl font-semibold mb-2 {iconColor}">{title}</h2>
-            <p className="text-gray-600 mb-6 whitespace-pre-line">{desc}</p>
+            <h2 className={`text-xl font-semibold mb-2 ${statusObj.iconColor}`}>{statusObj.title}</h2>
+            <p className="text-gray-600 mb-6 whitespace-pre-line">{statusObj.desc}</p>
+            {statusObj.showContact && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left max-w-sm mx-auto">
+                <div className="font-semibold text-yellow-700 mb-2">Thông tin liên hệ CSKH:</div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Phone className="w-5 h-5 text-blue-500" />
+                  <span className="font-medium text-gray-900">Hotline: <a href="tel:19001234" className="underline text-blue-700">1900 1234</a></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-green-500" />
+                  <span className="font-medium text-gray-900">Email: <a href="mailto:support@traveltour.vn" className="underline text-green-700">support@traveltour.vn</a></span>
+                </div>
+              </div>
+            )}
             <button
               onClick={() => router.push('/')}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200"

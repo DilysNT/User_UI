@@ -8,6 +8,8 @@ import { Card, CardContent } from "../../components/ui/card"
 import { Separator } from "../../components/ui/separator"
 import { CheckCircle2, MapPin, Calendar, Clock, Download, Home } from "lucide-react"
 import QRCode from "react-qr-code";
+import jsPDF from 'jspdf'
+import { addVietnameseTextToPDF } from "../../fonts/vietnamese-canvas-renderer"
 
 export default function BookingConfirmationPage({ params }: { params: { id: string } }) {
   const [showQR, setShowQR] = useState(false);
@@ -416,6 +418,439 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
     finalTourImage: tourImage
   });
 
+  // ======= ENHANCED VIETNAMESE CANVAS PDF EXPORT =======
+  const exportToPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const pdf = new jsPDF();
+      
+      // Constants for professional layout
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const leftCol = margin;
+      const rightCol = pageWidth - 100;
+      let yPosition = 30;
+      
+      // Helper function to add Vietnamese text with better formatting
+      const addVietnameseTextToPDF = (pdf: any, text: string, x: number, y: number, options: any = {}) => {
+        const { fontSize = 10, color = '#000000', bold = false, align = 'left' } = options;
+        
+        pdf.setFontSize(fontSize);
+        pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+        
+        if (color !== '#000000') {
+          if (color.startsWith('#')) {
+            const hex = color.slice(1);
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            pdf.setTextColor(r, g, b);
+          }
+        } else {
+          pdf.setTextColor(0, 0, 0);
+        }
+        
+        if (align === 'center') {
+          pdf.text(text, x, y, { align: 'center' });
+        } else if (align === 'right') {
+          pdf.text(text, x, y, { align: 'right' });
+        } else {
+          pdf.text(text, x, y);
+        }
+      };
+      
+      // Helper function to draw professional section headers
+      const drawSection = (title: string, y: number, bgColor: number[] = [37, 99, 235]) => {
+        // Gradient-like effect with multiple rectangles
+        pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+        pdf.rect(leftCol - 10, y - 5, pageWidth - 2*margin + 20, 18, 'F');
+        
+        pdf.setFillColor(bgColor[0] + 20, bgColor[1] + 20, bgColor[2] + 20);
+        pdf.rect(leftCol - 8, y - 3, pageWidth - 2*margin + 16, 14, 'F');
+        
+        addVietnameseTextToPDF(pdf, title, leftCol, y + 6, { 
+          fontSize: 12, bold: true, color: '#FFFFFF' 
+        });
+        return y + 25;
+      };
+      
+      // ===== PROFESSIONAL HEADER =====
+      // Main header background
+      pdf.setFillColor(37, 99, 235); // Professional blue
+      pdf.rect(0, 0, pageWidth, 55, 'F');
+      
+      // Company logo placeholder
+      pdf.setFillColor(255, 255, 255);
+      pdf.circle(leftCol + 15, 25, 12, 'F');
+      addVietnameseTextToPDF(pdf, '🏢', leftCol + 10, 30, { 
+        fontSize: 16, color: '#2563EB' 
+      });
+      
+      // Company info
+      addVietnameseTextToPDF(pdf, 'ABC TRAVEL COMPANY', leftCol + 35, 20, { 
+        fontSize: 16, bold: true, color: '#FFFFFF' 
+      });
+      addVietnameseTextToPDF(pdf, 'Công ty Du lịch ABC - Giấy phép kinh doanh số: 123456789', leftCol + 35, 32, { 
+        fontSize: 9, color: '#E5F3FF' 
+      });
+      addVietnameseTextToPDF(pdf, '📍 123 Nguyễn Văn Linh, Quận 7, TP.HCM | ☎ 1900 1234', leftCol + 35, 42, { 
+        fontSize: 9, color: '#E5F3FF' 
+      });
+      
+      // Invoice title
+      addVietnameseTextToPDF(pdf, 'HÓA ĐƠN DỊCH VỤ DU LỊCH', pageWidth/2, 72, { 
+        fontSize: 18, bold: true, align: 'center', color: '#1F2937' 
+      });
+      
+      yPosition = 90;
+      
+      // ===== BOOKING INFORMATION BOX =====
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 40, 'F');
+      pdf.setDrawColor(203, 213, 225);
+      pdf.setLineWidth(0.5);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 40);
+      
+      addVietnameseTextToPDF(pdf, 'MÃ ĐẶT TOUR:', leftCol + 5, yPosition + 8, { 
+        fontSize: 11, bold: true, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, bookingNumber || 'N/A', leftCol + 70, yPosition + 8, { 
+        fontSize: 11, color: '#DC2626', bold: true 
+      });
+      
+      addVietnameseTextToPDF(pdf, 'NGÀY LẬP:', leftCol + 5, yPosition + 20, { 
+        fontSize: 11, bold: true, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, new Date().toLocaleDateString('vi-VN'), leftCol + 70, yPosition + 20, { 
+        fontSize: 11, color: '#374151' 
+      });
+      
+      addVietnameseTextToPDF(pdf, 'TRẠNG THÁI:', rightCol - 60, yPosition + 8, { 
+        fontSize: 11, bold: true, color: '#374151' 
+      });
+      const statusText = paymentCompleted ? 'ĐÃ THANH TOÁN' : 'CHƯA THANH TOÁN';
+      const statusColor = paymentCompleted ? '#16A34A' : '#DC2626';
+      addVietnameseTextToPDF(pdf, statusText, rightCol - 60, yPosition + 20, { 
+        fontSize: 11, color: statusColor, bold: true 
+      });
+      
+      yPosition += 50;
+      
+      // ===== TOUR INFORMATION SECTION =====
+      yPosition = drawSection('📍 THÔNG TIN TOUR', yPosition, [34, 197, 94]);
+      yPosition += 10;
+      
+      // Tour details in a clean table format
+      pdf.setFillColor(249, 250, 251);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 55, 'F');
+      pdf.setDrawColor(209, 213, 219);
+      pdf.setLineWidth(0.3);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 55);
+      
+      // Tour name with elegant formatting
+      addVietnameseTextToPDF(pdf, 'Tên tour:', leftCol + 5, yPosition + 5, { 
+        fontSize: 10, bold: true, color: '#374151' 
+      });
+      const tourName = tourInfo?.name || 'Chưa có thông tin';
+      
+      if (tourName.length > 50) {
+        const words = tourName.split(' ');
+        let line = '';
+        let currentY = yPosition + 5;
+        
+        words.forEach(word => {
+          if ((line + word).length > 50) {
+            addVietnameseTextToPDF(pdf, line.trim(), leftCol + 60, currentY, { 
+              fontSize: 10, color: '#1F2937' 
+            });
+            line = word + ' ';
+            currentY += 12;
+          } else {
+            line += word + ' ';
+          }
+        });
+        if (line.trim()) {
+          addVietnameseTextToPDF(pdf, line.trim(), leftCol + 60, currentY, { 
+            fontSize: 10, color: '#1F2937' 
+          });
+        }
+        yPosition = currentY + 10;
+      } else {
+        addVietnameseTextToPDF(pdf, tourName, leftCol + 60, yPosition + 5, { 
+          fontSize: 10, color: '#1F2937' 
+        });
+        yPosition += 15;
+      }
+      
+      // Location and departure in two columns
+      addVietnameseTextToPDF(pdf, 'Địa điểm:', leftCol + 5, yPosition, { 
+        fontSize: 10, bold: true, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, tourInfo?.location || 'Chưa xác định', leftCol + 60, yPosition, { 
+        fontSize: 10, color: '#1F2937' 
+      });
+      
+      if (departureInfo?.departure_date) {
+        addVietnameseTextToPDF(pdf, 'Khởi hành:', rightCol - 80, yPosition, { 
+          fontSize: 10, bold: true, color: '#374151' 
+        });
+        addVietnameseTextToPDF(pdf, new Date(departureInfo.departure_date).toLocaleDateString('vi-VN'), rightCol - 20, yPosition, { 
+          fontSize: 10, color: '#1F2937' 
+        });
+      }
+      
+      yPosition += 20;
+      
+      // Agency info if available
+      if (agencyName) {
+        addVietnameseTextToPDF(pdf, 'Đơn vị tổ chức:', leftCol + 5, yPosition, { 
+          fontSize: 10, bold: true, color: '#374151' 
+        });
+        addVietnameseTextToPDF(pdf, agencyName, leftCol + 80, yPosition, { 
+          fontSize: 10, color: '#059669' 
+        });
+        yPosition += 15;
+      }
+      
+      yPosition += 10;
+      
+      // ===== PARTICIPANTS SECTION =====
+      yPosition = drawSection('👥 CHI TIẾT KHÁCH HÀNG', yPosition, [168, 85, 247]);
+      yPosition += 10;
+      
+      // Modern table design
+      pdf.setFillColor(67, 56, 202);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 20, 'F');
+      
+      // Table headers with white text
+      addVietnameseTextToPDF(pdf, 'LOẠI KHÁCH', leftCol + 5, yPosition + 8, { 
+        fontSize: 11, bold: true, color: '#FFFFFF' 
+      });
+      addVietnameseTextToPDF(pdf, 'SỐ LƯỢNG', leftCol + 80, yPosition + 8, { 
+        fontSize: 11, bold: true, color: '#FFFFFF' 
+      });
+      addVietnameseTextToPDF(pdf, 'ĐƠN GIÁ', rightCol - 50, yPosition + 8, { 
+        fontSize: 11, bold: true, color: '#FFFFFF' 
+      });
+      
+      yPosition += 25;
+      
+      // Calculate prices
+      const adultPrice = Math.floor(displayAmount / ((bookingInfo?.adult_count || 1) + (bookingInfo?.child_count || 0) * 0.7));
+      const childPrice = Math.floor(adultPrice * 0.7);
+      
+      // Adult row with alternating background
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(leftCol - 5, yPosition - 3, pageWidth - 2*margin + 10, 15, 'F');
+      
+      addVietnameseTextToPDF(pdf, 'Người lớn', leftCol + 5, yPosition + 5, { 
+        fontSize: 10, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, `${bookingInfo?.adult_count || 0} người`, leftCol + 80, yPosition + 5, { 
+        fontSize: 10, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, `${adultPrice.toLocaleString('vi-VN')} VNĐ`, rightCol - 50, yPosition + 5, { 
+        fontSize: 10, color: '#374151' 
+      });
+      
+      yPosition += 18;
+      
+      // Child row
+      addVietnameseTextToPDF(pdf, 'Trẻ em (70% giá)', leftCol + 5, yPosition + 5, { 
+        fontSize: 10, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, `${bookingInfo?.child_count || 0} người`, leftCol + 80, yPosition + 5, { 
+        fontSize: 10, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, `${childPrice.toLocaleString('vi-VN')} VNĐ`, rightCol - 50, yPosition + 5, { 
+        fontSize: 10, color: '#374151' 
+      });
+      
+      yPosition += 25;
+      
+      // ===== CUSTOMER INFORMATION SECTION =====
+      yPosition = drawSection('👤 THÔNG TIN KHÁCH HÀNG', yPosition, [236, 72, 153]);
+      yPosition += 10;
+      
+      // Customer info in elegant cards
+      pdf.setFillColor(252, 231, 243);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 35, 'F');
+      pdf.setDrawColor(236, 72, 153);
+      pdf.setLineWidth(0.5);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 35);
+      
+      // Two column layout for customer info
+      addVietnameseTextToPDF(pdf, 'Họ và tên:', leftCol + 5, yPosition + 5, { 
+        fontSize: 10, bold: true, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, contactName || 'Chưa có thông tin', leftCol + 60, yPosition + 5, { 
+        fontSize: 10, color: '#1F2937' 
+      });
+      
+      addVietnameseTextToPDF(pdf, 'Số điện thoại:', leftCol + 5, yPosition + 18, { 
+        fontSize: 10, bold: true, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, contactPhone || 'Chưa có', leftCol + 70, yPosition + 18, { 
+        fontSize: 10, color: '#1F2937' 
+      });
+      
+      addVietnameseTextToPDF(pdf, 'Email:', rightCol - 80, yPosition + 5, { 
+        fontSize: 10, bold: true, color: '#374151' 
+      });
+      const emailText = contactEmail || 'Chưa có email';
+      addVietnameseTextToPDF(pdf, emailText.length > 25 ? emailText.substring(0, 25) + '...' : emailText, 
+        rightCol - 45, yPosition + 5, { fontSize: 10, color: '#1F2937' });
+      
+      yPosition += 45;
+      
+      // ===== PAYMENT BREAKDOWN SECTION =====
+      yPosition = drawSection('💰 CHI TIẾT THANH TOÁN', yPosition, [220, 38, 127]);
+      yPosition += 10;
+      
+      // Payment summary table
+      pdf.setFillColor(253, 242, 248);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 80, 'F');
+      pdf.setDrawColor(220, 38, 127);
+      pdf.setLineWidth(0.3);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 80);
+      
+      // Subtotal
+      addVietnameseTextToPDF(pdf, 'Tổng giá tour:', leftCol + 5, yPosition + 8, { 
+        fontSize: 11, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, `${displayAmount.toLocaleString('vi-VN')} VNĐ`, rightCol, yPosition + 8, { 
+        fontSize: 11, color: '#374151' 
+      });
+      
+      yPosition += 15;
+      
+      // Service fee
+      addVietnameseTextToPDF(pdf, 'Phí dịch vụ:', leftCol + 5, yPosition + 8, { 
+        fontSize: 11, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, 'Đã bao gồm', rightCol, yPosition + 8, { 
+        fontSize: 11, color: '#16A34A' 
+      });
+      
+      yPosition += 15;
+      
+      // VAT
+      addVietnameseTextToPDF(pdf, 'Thuế VAT (10%):', leftCol + 5, yPosition + 8, { 
+        fontSize: 11, color: '#374151' 
+      });
+      addVietnameseTextToPDF(pdf, 'Đã bao gồm', rightCol, yPosition + 8, { 
+        fontSize: 11, color: '#16A34A' 
+      });
+      
+      yPosition += 20;
+      
+      // Discount if applicable
+      if (bookingInfo.discount_amount && Number(bookingInfo.discount_amount) > 0) {
+        addVietnameseTextToPDF(pdf, 'Giảm giá:', leftCol + 5, yPosition + 8, { 
+          fontSize: 11, color: '#374151' 
+        });
+        addVietnameseTextToPDF(pdf, `-${Number(bookingInfo.discount_amount).toLocaleString('vi-VN')} VNĐ`, rightCol, yPosition + 8, { 
+          fontSize: 11, color: '#DC2626' 
+        });
+        yPosition += 15;
+      }
+      
+      // Total highlight
+      pdf.setFillColor(220, 38, 127);
+      pdf.rect(leftCol - 5, yPosition, pageWidth - 2*margin + 10, 20, 'F');
+      
+      addVietnameseTextToPDF(pdf, 'TỔNG THANH TOÁN', leftCol + 5, yPosition + 12, { 
+        fontSize: 14, bold: true, color: '#FFFFFF' 
+      });
+      addVietnameseTextToPDF(pdf, `${displayAmount.toLocaleString('vi-VN')} VNĐ`, rightCol, yPosition + 12, { 
+        fontSize: 14, bold: true, color: '#FFFFFF' 
+      });
+      
+      yPosition += 35;
+      
+      // ===== TERMS AND CONDITIONS =====
+      if (yPosition > pageHeight - 100) {
+        pdf.addPage();
+        yPosition = 30;
+      }
+      
+      // Important notes section
+      pdf.setFillColor(254, 242, 242);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 80, 'F');
+      pdf.setDrawColor(239, 68, 68);
+      pdf.setLineWidth(0.3);
+      pdf.rect(leftCol - 5, yPosition - 5, pageWidth - 2*margin + 10, 80);
+      
+      addVietnameseTextToPDF(pdf, '⚠️ LƯU Ý QUAN TRỌNG', leftCol + 5, yPosition + 8, { 
+        fontSize: 12, bold: true, color: '#DC2626' 
+      });
+      yPosition += 20;
+      
+      const terms = [
+        '• Vui lòng giữ hóa đơn này để làm thủ tục check-in tại điểm tập trung',
+        '• Mang theo CMND/CCCD và các giấy tờ tùy thân hợp lệ khi tham gia tour',
+        '• Có mặt tại điểm tập trung trước giờ khởi hành 30 phút',
+        '• Liên hệ hotline 1900 1234 nếu có thay đổi lịch trình khẩn cấp',
+        '• Chính sách hủy tour và hoàn tiền theo quy định của công ty'
+      ];
+      
+      terms.forEach(term => {
+        addVietnameseTextToPDF(pdf, term, leftCol + 10, yPosition, { 
+          fontSize: 9, color: '#7F1D1D' 
+        });
+        yPosition += 12;
+      });
+      
+      yPosition += 15;
+      
+      // ===== PROFESSIONAL FOOTER =====
+      pdf.setFillColor(37, 99, 235);
+      pdf.rect(0, yPosition - 5, pageWidth, 50, 'F');
+      
+      // Company contact info
+      addVietnameseTextToPDF(pdf, 'ABC TRAVEL COMPANY', leftCol, yPosition + 8, { 
+        fontSize: 12, bold: true, color: '#FFFFFF' 
+      });
+      addVietnameseTextToPDF(pdf, 'Công ty TNHH Du lịch ABC - Uy tín hàng đầu Việt Nam', leftCol, yPosition + 20, { 
+        fontSize: 9, color: '#E5F3FF' 
+      });
+      
+      yPosition += 25;
+      
+      // Contact details in organized layout
+      addVietnameseTextToPDF(pdf, '📍 123 Nguyễn Văn Linh, Quận 7, TP.HCM', leftCol, yPosition, { 
+        fontSize: 8, color: '#E5F3FF' 
+      });
+      addVietnameseTextToPDF(pdf, '📞 1900 1234', leftCol + 120, yPosition, { 
+        fontSize: 8, color: '#E5F3FF' 
+      });
+      
+      yPosition += 10;
+      
+      addVietnameseTextToPDF(pdf, '📧 support@abctravel.vn', leftCol, yPosition, { 
+        fontSize: 8, color: '#E5F3FF' 
+      });
+      addVietnameseTextToPDF(pdf, '🌐 www.abctravel.vn', leftCol + 120, yPosition, { 
+        fontSize: 8, color: '#E5F3FF' 
+      });
+      
+      // License info
+      addVietnameseTextToPDF(pdf, 'Giấy phép KDLNTQ: 79-1234/2024/TCDL-GP LHQT', pageWidth/2, yPosition + 10, { 
+        fontSize: 7, color: '#CBD5E1' 
+      });
+      
+      // Save with descriptive filename
+      const timestamp = new Date().getTime();
+      const filename = `hoa-don-tour-${bookingNumber?.slice(-6) || timestamp}-${new Date().toLocaleDateString('vi-VN').replace(/\//g, '')}.pdf`;
+      pdf.save(filename);
+      
+    } catch (error) {
+      console.error('❌ PDF Export Error:', error);
+      alert('Lỗi khi xuất PDF. Vui lòng thử lại!');
+    }
+  };
+
   // Debug component để kiểm tra URL parameters
   const URLParamsDebug = () => {
     if (process.env.NODE_ENV !== 'development') return null;
@@ -462,6 +897,18 @@ export default function BookingConfirmationPage({ params }: { params: { id: stri
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Tải vé điện tử
+                </Button>
+              </div>
+              
+              {/* PDF Export Button */}
+              <div className="flex-shrink-0 w-full sm:w-auto">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center justify-center w-full sm:w-auto whitespace-nowrap bg-blue-50 border-blue-200 hover:bg-blue-100" 
+                  onClick={exportToPDF}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Xuất hóa đơn PDF
                 </Button>
               </div>
             </div>

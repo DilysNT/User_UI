@@ -38,8 +38,20 @@ const PublicPromoCodes = () => {
   const [promoCodes, setPromoCodes] = useState<PublicPromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
 
   useEffect(() => {
+    // Kiểm tra trạng thái đăng nhập
+    const checkAuthStatus = () => {
+      const authToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+      setIsUserLoggedIn(!!authToken);
+    };
+    
+    checkAuthStatus();
+    
+    // Lắng nghe sự kiện storage để phát hiện thay đổi đăng nhập
+    window.addEventListener('storage', checkAuthStatus);
+    
     const fetchPromoCodes = async () => {
       try {
         const response = await fetch("http://localhost:5000/api/promotions/active");
@@ -78,9 +90,20 @@ const PublicPromoCodes = () => {
       }
     };
     fetchPromoCodes();
+    
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('storage', checkAuthStatus);
+    };
   }, []);
 
   const copyToClipboard = async (code: string) => {
+    // Kiểm tra đăng nhập trước khi copy
+    if (!isUserLoggedIn) {
+      alert("Bạn cần đăng nhập để sử dụng mã giảm giá này!");
+      return;
+    }
+    
     try {
       await navigator.clipboard.writeText(code);
       setCopiedCode(code);
@@ -127,9 +150,24 @@ const PublicPromoCodes = () => {
                 {promo.agencyName && (
                   <div className="text-[#0057B8] text-sm font-medium mb-1">Đại lý áp dụng: {promo.agencyName}</div>
                 )}
-                <div className="text-gray-500 text-xs mb-3 text-color-red-500">
-                 <span className="text-red-500 font-semibold">*Mã giảm giá chỉ dùng cho các tour do đại lý này quản lý.</span>
+                
+                {/* Thông báo yêu cầu đăng nhập */}
+                <div className="text-gray-500 text-xs mb-2">
+                  <span className="text-red-500 font-semibold">*Mã giảm giá chỉ dùng cho các tour do đại lý này quản lý.</span>
                 </div>
+                
+                {/* Thông báo yêu cầu đăng nhập */}
+                {!isUserLoggedIn && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-600 text-xs">⚠️</span>
+                      <span className="text-yellow-700 text-xs font-medium">
+                        Cần đăng nhập để sử dụng mã giảm giá
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center gap-2 mb-2">
                   <div className="flex-1 bg-[#F4F8FB] rounded-lg px-3 py-2 flex items-center">
                     <span className="font-mono text-[#0057B8] text-base font-semibold tracking-wider">
@@ -138,9 +176,15 @@ const PublicPromoCodes = () => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(promo.code)}
-                    className="ml-2 px-4 py-2 bg-[#EAF6FF] text-[#0057B8] rounded-lg font-medium text-sm border border-[#B3D8F6] hover:bg-[#D0E8FF] transition"
+                    disabled={!isUserLoggedIn}
+                    className={`ml-2 px-4 py-2 rounded-lg font-medium text-sm border transition ${
+                      isUserLoggedIn 
+                        ? 'bg-[#EAF6FF] text-[#0057B8] border-[#B3D8F6] hover:bg-[#D0E8FF] cursor-pointer'
+                        : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    }`}
+                    title={!isUserLoggedIn ? "Cần đăng nhập để sử dụng mã giảm giá" : ""}
                   >
-                    {copiedCode === promo.code ? "✓" : "Copy"}
+                    {copiedCode === promo.code ? "✓" : isUserLoggedIn ? "Copy" : "🔒"}
                   </button>
                 </div>
                 <div className="absolute top-3 right-3">

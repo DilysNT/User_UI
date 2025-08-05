@@ -51,11 +51,9 @@ export default function SearchPage() {
     setToday(new Date().toISOString().split("T")[0])
     
     // Extract search params and set criteria
-    const destination = searchParams.get('destination') || '';
-    const departure = searchParams.get('departure') || '';
-    const preferredDate = searchParams.get('preferredDate') || '';
-    const startDateRange = searchParams.get('startDateRange') || '';
-    const endDateRange = searchParams.get('endDateRange') || '';
+    console.log('📋 URL Parameters:', {
+      destination, departure, preferredDate, startDateRange, endDateRange, tourName
+    });
     
     setSearchCriteria({
       destination,
@@ -64,7 +62,7 @@ export default function SearchPage() {
       startDateRange,
       endDateRange
     });
-  }, [searchParams])
+  }, [destination, departure, preferredDate, startDateRange, endDateRange, tourName])
 
   // State for fetched tours (search results only)
   const [searchName, setSearchName] = useState("");
@@ -84,61 +82,286 @@ export default function SearchPage() {
     
     const fetchToursWithDates = async () => {
       try {
-        // Use searchCriteria state instead of direct searchParams
-        const { destination, departure, startDateRange, endDateRange, preferredDate } = searchCriteria;
+        // Use both URL params and searchCriteria state
+        const searchDestination = destination || searchCriteria.destination;
+        const searchDeparture = departure || searchCriteria.departure;
+        const searchStartDateRange = startDateRange || searchCriteria.startDateRange;
+        const searchEndDateRange = endDateRange || searchCriteria.endDateRange;
+        const searchPreferredDate = preferredDate || searchCriteria.preferredDate;
         
-        console.log('🔍 Search Parameters:', {
-          destination, tourName, departure, startDateRange, endDateRange, preferredDate, searchName
+        console.log('🔍 Final Search Parameters:', {
+          tourName, 
+          searchDestination, 
+          searchDeparture, 
+          searchStartDateRange, 
+          searchEndDateRange, 
+          searchPreferredDate, 
+          searchName
         });
         
-        // Fetch all tours first
-        const toursResponse = await fetch('http://localhost:5000/api/tours');
-        
-        if (!toursResponse.ok) {
-          throw new Error(`API Error: ${toursResponse.status} ${toursResponse.statusText}`);
+        // Try to fetch from API first
+        let tours: any[] = [];
+        try {
+          const toursResponse = await fetch('http://localhost:5000/api/tours?limit=100', {
+            mode: 'cors'
+          });
+          
+          if (toursResponse.ok) {
+            let response = await toursResponse.json();
+            console.log('🌐 API Response:', response);
+            console.log('🌐 Total tours in response:', response.data?.length || 0);
+            tours = Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : []);
+            // Lọc chỉ các tour có status 'Đang hoạt động'
+            tours = tours.filter(tour => tour.status === 'Đang hoạt động');
+            // Map trường dữ liệu từ API sang FE
+            tours = tours.map(tour => ({
+              ...tour,
+              departureDates: tour.departure_dates || [],
+              images: tour.images || [],
+              category: tour.category || "",
+              location: tour.location || "",
+              destination: tour.destination || "",
+              price: tour.price || 0,
+              name: tour.name || "",
+              id: tour.id || tour._id || "",
+            }));
+            console.log('🎯 Parsed tours from API:', tours.length, 'tours');
+          } else {
+            console.log('API failed, using fallback data');
+            tours = [];
+          }
+        } catch (error) {
+          console.log('API error, using fallback data:', error);
+          tours = [];
         }
-        // Process tours data here
-        let response = await toursResponse.json();
-        let tours = Array.isArray(response.data) ? response.data : [];
 
-        // Ưu tiên lọc theo tourName nếu có
+        // If no data from API, use fallback data
+        if (tours.length === 0) {
+          tours = [
+            {
+              id: 'mock-1',
+              name: 'Tour khám phá Đà Lạt 3N2Đ',
+              description: 'Khám phá thành phố ngàn hoa với thác Elephant, chùa Linh Phước và các điểm tham quan nổi tiếng',
+              location: 'Đà Lạt',
+              destination: 'Đà Lạt, Lâm Đồng',
+              departure_location: 'Hồ Chí Minh',
+              price: 3500000,
+              max_participants: 20,
+              min_participants: 10,
+              status: 'Đang hoạt động',
+              images: [
+                {
+                  id: 'img-1',
+                  image_url: 'https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg',
+                  is_main: true
+                }
+              ],
+              departureDates: [
+                {
+                  departureDates_id: 'date-1',
+                  departure_date: '2025-08-15',
+                  end_date: '2025-08-18',
+                  number_of_days: 3,
+                  number_of_nights: 2,
+                  available_slots: 15,
+                  booked: 5
+                }
+              ]
+            },
+            {
+              id: 'mock-2',
+              name: 'Tour Phú Quốc 4N3Đ - Khám phá đảo ngọc',
+              description: 'Khám phá đảo ngọc Phú Quốc với biển xanh, cát trắng, cáp treo Hòn Thơm và các hoạt động thú vị',
+              location: 'Phú Quốc',
+              destination: 'Phú Quốc, Kiên Giang',
+              departure_location: 'Hồ Chí Minh',
+              price: 4200000,
+              max_participants: 25,
+              min_participants: 12,
+              status: 'Đang hoạt động',
+              images: [
+                {
+                  id: 'img-2',
+                  image_url: 'https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg',
+                  is_main: true
+                }
+              ],
+              departureDates: [
+                {
+                  departureDates_id: 'date-2',
+                  departure_date: '2025-08-20',
+                  end_date: '2025-08-24',
+                  number_of_days: 4,
+                  number_of_nights: 3,
+                  available_slots: 20,
+                  booked: 8
+                }
+              ]
+            },
+            {
+              id: 'mock-3',
+              name: 'Tour Đà Lạt tham quan thác Elephant',
+              description: 'Tham quan thác Elephant nổi tiếng và các điểm du lịch Đà Lạt',
+              location: 'Đà Lạt',
+              destination: 'Đà Lạt, thác Elephant',
+              departure_location: 'Hà Nội',
+              price: 3800000,
+              max_participants: 18,
+              min_participants: 8,
+              status: 'Đang hoạt động',
+              images: [
+                {
+                  id: 'img-3',
+                  image_url: 'https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg',
+                  is_main: true
+                }
+              ],
+              departureDates: [
+                {
+                  departureDates_id: 'date-3',
+                  departure_date: '2025-08-25',
+                  end_date: '2025-08-28',
+                  number_of_days: 3,
+                  number_of_nights: 2,
+                  available_slots: 12,
+                  booked: 3
+                }
+              ]
+            },
+            {
+              id: 'mock-4',
+              name: 'Tour Phú Quốc - Vinpearl Safari',
+              description: 'Tham quan vườn thú Safari Phú Quốc và trải nghiệm cáp treo vượt biển dài nhất thế giới',
+              location: 'Phú Quốc',
+              destination: 'Phú Quốc, Vinpearl Safari',
+              departure_location: 'Hà Nội',
+              price: 5200000,
+              max_participants: 30,
+              min_participants: 15,
+              status: 'Đang hoạt động',
+              images: [
+                {
+                  id: 'img-4',
+                  image_url: 'https://res.cloudinary.com/dojbjbbjw/image/upload/v1752641022/DaLat_pdp01z.jpg',
+                  is_main: true
+                }
+              ],
+              departureDates: [
+                {
+                  departureDates_id: 'date-4',
+                  departure_date: '2025-08-30',
+                  end_date: '2025-09-02',
+                  number_of_days: 4,
+                  number_of_nights: 3,
+                  available_slots: 25,
+                  booked: 10
+                }
+              ]
+            }
+          ];
+        }
+
+        // Hàm loại bỏ dấu tiếng Việt
+        function removeAccents(str) {
+          if (!str) return "";
+          return str
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d")
+            .replace(/Đ/g, "D");
+        }
+
+        // Enhanced search logic with better matching
+        console.log('🔍 Before filtering, tours count:', tours.length);
+        
         if (tourName && tourName.trim()) {
-          const keyword = tourName.trim().toLowerCase();
-          tours = tours.filter(tour => tour.name && tour.name.toLowerCase().includes(keyword));
+          const keyword = removeAccents(tourName.trim().toLowerCase());
+          console.log('🔍 Searching by tourName:', keyword);
+          // Chỉ lọc theo trường name
+          tours = tours.filter(tour => {
+            if (!tour || typeof tour !== 'object' || !tour.name) return false;
+            return removeAccents(tour.name.toLowerCase()).includes(keyword);
+          });
+          // Loại bỏ trùng lặp theo id
+          const seenIds = new Set();
+          tours = tours.filter(tour => {
+            if (seenIds.has(tour.id)) return false;
+            seenIds.add(tour.id);
+            return true;
+          });
+          tours.forEach(tour => {
+            console.log('✅ Tour matched:', tour.name, '- destination:', tour.destination);
+          });
         } else if (searchName && searchName.trim()) {
-          const keyword = searchName.trim().toLowerCase();
+          const keyword = removeAccents(searchName.trim().toLowerCase());
+          console.log('🔍 Searching by searchName:', keyword);
           tours = tours.filter(tour => {
             if (!tour || typeof tour !== 'object') return false;
-            const nameMatch = tour.name && tour.name.toLowerCase().includes(keyword);
-            const locationMatch = tour.destination && tour.destination.toLowerCase().includes(keyword);
-            return nameMatch || locationMatch;
+            
+            const searchFields = [
+              tour.name,
+              tour.description,
+              tour.location,
+              tour.destination
+            ].filter(Boolean);
+            
+            return searchFields.some(field => 
+              removeAccents(field.toLowerCase()).includes(keyword)
+            );
           });
-        } else if (destination && destination.trim()) {
-          const destKeyword = destination.trim().toLowerCase();
+        } else if (searchDestination && searchDestination.trim()) {
+          const destKeyword = removeAccents(searchDestination.trim().toLowerCase());
+          console.log('🔍 Searching by destination:', destKeyword);
           tours = tours.filter(tour => {
             if (!tour || typeof tour !== 'object') return false;
             const locationFields = [tour.location, tour.destination].filter(Boolean);
-            return locationFields.some(field => field.toLowerCase().includes(destKeyword));
+            
+            const match = locationFields.some(field => 
+              removeAccents(field.toLowerCase()).includes(destKeyword)
+            );
+            
+            if (match) {
+              console.log('✅ Tour matched by destination:', tour.name, '- destination:', tour.destination);
+            }
+            
+            return match;
           });
         }
+        
+        console.log('🎯 After filtering, tours count:', tours.length);
 
         // Filter by departure location
-        if (departure) {
+        if (searchDeparture) {
           const toursWithDeparture = tours.filter(t => t.departure_location);
           if (toursWithDeparture.length > 0) {
-            tours = tours.filter(tour => tour.departure_location && tour.departure_location.toLowerCase().includes(departure.toLowerCase()));
+            tours = tours.filter(tour => tour.departure_location && tour.departure_location.toLowerCase().includes(searchDeparture.toLowerCase()));
           }
         }
 
         // Filter by departure dates within range
-        if (startDateRange && endDateRange) {
+        if (searchStartDateRange && searchEndDateRange) {
           const filteredTours: any[] = [];
           for (const tour of tours) {
             try {
-              const datesResponse = await fetch(`http://localhost:5000/api/departure-dates/by-tour/${tour.id}`);
-              const dates = await datesResponse.json();
-              if (Array.isArray(dates)) {
-                const hasMatchingDate = dates.some(date => {
+              let dates: any[] = [];
+              
+              // Try to get departure dates from API first
+              if (tour.id && !tour.id.startsWith('mock-')) {
+                const datesResponse = await fetch(`http://localhost:5000/api/departure-dates/by-tour/${tour.id}`, {
+                  mode: 'cors'
+                });
+                if (datesResponse.ok) {
+                  dates = await datesResponse.json();
+                }
+              }
+              
+              // Fallback to tour's departureDates if API fails or it's mock data
+              if (!Array.isArray(dates) || dates.length === 0) {
+                dates = tour.departureDates || [];
+              }
+              
+              if (Array.isArray(dates) && dates.length > 0) {
+                const hasMatchingDate = dates.some((date: any) => {
                   const departureDate = new Date(date.departure_date);
                   const startRange = new Date(startDateRange);
                   const endRange = new Date(endDateRange);
@@ -150,19 +373,22 @@ export default function SearchPage() {
                 }
               }
             } catch (error) {
-              // Ignore error for this tour
+              // If there's an error, still include tour if it has departureDates
+              if (tour.departureDates && Array.isArray(tour.departureDates)) {
+                filteredTours.push(tour);
+              }
             }
           }
           tours = filteredTours;
         }
 
         // Sort by proximity to preferred date
-        if (preferredDate && tours.length > 0) {
-          const preferredDateTime = new Date(preferredDate).getTime();
-          tours.sort((a, b) => {
-            const getClosestDate = (tour) => {
-              if (!tour.departureDates) return Infinity;
-              return Math.min(...tour.departureDates.map(date => Math.abs(new Date(date.departure_date).getTime() - preferredDateTime)));
+        if (searchPreferredDate && tours.length > 0) {
+          const preferredDateTime = new Date(searchPreferredDate).getTime();
+          tours.sort((a: any, b: any) => {
+            const getClosestDate = (tour: any) => {
+              if (!tour.departureDates || !Array.isArray(tour.departureDates)) return Infinity;
+              return Math.min(...tour.departureDates.map((date: any) => Math.abs(new Date(date.departure_date).getTime() - preferredDateTime)));
             };
             return getClosestDate(a) - getClosestDate(b);
           });
@@ -176,14 +402,14 @@ export default function SearchPage() {
       }
     };
     fetchToursWithDates();
-  }, [searchName, tourName, searchCriteria.destination, searchCriteria.departure, searchCriteria.startDateRange, searchCriteria.endDateRange, searchCriteria.preferredDate]);
+  }, [searchName, tourName, destination, departure, startDateRange, endDateRange, preferredDate]);
 
   // Fetch destination and category options on mount
   useEffect(() => {
     // Nếu đang lọc theo tên tour, chỉ lấy các destination của các tour đã lọc
     if (tourName && tourName.trim()) {
       const keyword = tourName.trim().toLowerCase();
-      fetch('http://localhost:5000/api/tours')
+      fetch('http://localhost:5000/api/tours?limit=100')
         .then(res => res.json())
         .then(response => {
           const tours = Array.isArray(response.data) ? response.data : [];
@@ -203,7 +429,7 @@ export default function SearchPage() {
     // Nếu đang lọc theo tên tour, chỉ lấy các category thuộc các tour đã lọc
     if (tourName && tourName.trim()) {
       const keyword = tourName.trim().toLowerCase();
-      fetch('http://localhost:5000/api/tours')
+      fetch('http://localhost:5000/api/tours?limit=100')
         .then(res => res.json())
         .then(response => {
           const tours = Array.isArray(response.data) ? response.data : [];
@@ -277,46 +503,42 @@ export default function SearchPage() {
       image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=300&h=200&fit=crop",
       duration: "6 giờ",
       price: 5800000,
-      rating: 4.8,
+rating: 4.8,
       reviews: 73,
     },
-  ];
-  
-  const adventureTours = [
-    {
-      id: 101,
-      title: "Alaska: Tham quan Denali từ Fairbanks đến Công viên Quốc gia",
-      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=200&fit=crop",
-      duration: "7 giờ",
-      price: 6500000,
-      rating: 4.4,
-      reviews: 89,
-    },
-    {
-      id: 102,
-      title: "Alaska: Thông qua Denali từ Fairbanks đến Công viên Quốc gia",
-      image: "https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?w=300&h=200&fit=crop",
-      duration: "5 giờ",
-      price: 5500000,
-      rating: 4.2,
-      reviews: 67,
-    }
   ];
 
   // Filter tours based on filters
   const filteredTours = useMemo(() => {
-    return tours.filter(tour => {
-      // Lọc theo điểm đến
-      if (filters.destination && tour.destination !== filters.destination) return false;
-      // Lọc theo danh mục tour (category): kiểm tra tour.categories (mảng) có chứa category name
+    console.log('🔧 filteredTours useMemo - tours count:', tours.length);
+    console.log('🔧 filteredTours useMemo - filters:', filters);
+    
+    // Accent-insensitive compare function
+    function removeAccents(str) {
+      if (!str) return "";
+      return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D");
+    }
+    
+    const result = tours.filter(tour => {
+      // Lọc theo điểm đến (accent-insensitive)
+      if (filters.destination) {
+        const tourDest = removeAccents(tour.destination || "").toLowerCase();
+        const filterDest = removeAccents(filters.destination).toLowerCase();
+        if (tourDest !== filterDest) return false;
+      }
+      // Lọc theo danh mục tour (category): kiểm tra tour.categories (mảng) có chứa category name (accent-insensitive)
       if (filters.category) {
-        // Nếu tour có trường categories là mảng
+        const filterCat = removeAccents(filters.category).toLowerCase();
         if (Array.isArray(tour.categories)) {
-          const hasCategory = tour.categories.some(cat => cat.name === filters.category);
+          const hasCategory = tour.categories.some(cat => removeAccents(cat.name).toLowerCase() === filterCat);
           if (!hasCategory) return false;
-        } else if (tour.category && tour.category !== filters.category) {
-          // Nếu tour có trường category là string
-          return false;
+        } else if (tour.category) {
+          const tourCat = removeAccents(tour.category).toLowerCase();
+          if (tourCat !== filterCat) return false;
         }
       }
       // Lọc theo ngày khởi hành (so sánh departure_date với dateFrom)
@@ -327,21 +549,48 @@ export default function SearchPage() {
       }
       return true;
     });
+    
+    console.log('🔧 filteredTours result count:', result.length);
+    return result;
   }, [tours, filters]);
 
+  // Adventure tours liên quan đến kết quả tìm kiếm
+  const adventureTours = useMemo(() => {
+    if (!filteredTours) return [];
+    // Nếu không có kết quả tìm kiếm
+    if (filteredTours.length === 0) {
+      if (!filters.destination && !filters.category && !filters.dateFrom && !tourName) {
+        return tours;
+      }
+      return [];
+    }
+    // Gợi ý tất cả các tour khác không trùng id với kết quả chính
+    const resultIds = filteredTours.map(t => t.id);
+    return tours.filter(tour => !resultIds.includes(tour.id));
+  }, [filteredTours, tours, filters, tourName]);
+
+  // Filter tours based on filters
+  // (Keep only one declaration of filteredTours)
+  // REMOVED DUPLICATE filteredTours DECLARATION
+
   const sortedTours = useMemo(() => {
+    console.log('🎯 sortedTours useMemo - filteredTours count:', filteredTours.length);
     const sorted = [...filteredTours];
     switch (sortBy) {
       case "price-low":
-        return sorted.sort((a, b) => a.price - b.price);
+        return sorted.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
       case "price-high":
-        return sorted.sort((a, b) => b.price - a.price);
+        return sorted.sort((a: any, b: any) => (b.price || 0) - (a.price || 0));
       case "rating":
-        return sorted.sort((a, b) => b.rating - a.rating);
+        return sorted.sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0));
       case "duration":
-        return sorted.sort((a, b) => Number.parseFloat(a.duration) - Number.parseFloat(b.duration));
+        return sorted.sort((a: any, b: any) => {
+          const aDuration = a.departureDates?.[0]?.number_of_days || parseFloat(a.duration) || 0;
+          const bDuration = b.departureDates?.[0]?.number_of_days || parseFloat(b.duration) || 0;
+          return aDuration - bDuration;
+        });
       default:
-        return sorted.sort((a, b) => b.reviews - a.reviews);
+        return sorted.sort((a: any, b: any) => (b.reviews || 0) - (a.reviews || 0));
     }
   }, [filteredTours, sortBy]);
 
@@ -627,12 +876,13 @@ export default function SearchPage() {
         </div>
         )}
 
-        {/* Outside The City Specials */}
+
         <section className="mt-16">
-          <h2 className="text-3xl font-bold text-gray-800 mb-8">Ưu đãi đặc biệt ngoài thành phố</h2>
+          {/* Outside The City Specials */}
+          {/* <h2 className="text-3xl font-bold text-gray-800 mb-8">Ưu đãi đặc biệt ngoài thành phố</h2> */}
 
           {/* Premium Tours */}
-          <div className="mb-8">
+          {/* <div className="mb-8">
             <div className="flex items-center gap-3 mb-6">
               <span className="inline-block bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
                 Premium
@@ -666,33 +916,32 @@ export default function SearchPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Adventure Tours */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-6">
               <span className="inline-block bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                Phiêu lưu
+                Gợi ý các tour cho bạn
               </span>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {adventureTours.map((tour) => (
+              {adventureTours.length > 0 ? adventureTours.map((tour) => (
                 <div
                   key={tour.id}
                   className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-1"
                 >
                   <div className="relative h-48">
-                    <Image src={tour.image || "/placeholder.svg"} alt={tour.title} fill className="object-cover" />
+                    <Image src={tour.images?.[0]?.image_url || tour.image || tour.image_url || tour.main_image || "/placeholder.svg"} alt={tour.name || tour.title || "Tour image"} fill className="object-cover" />
                   </div>
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-3 line-clamp-2">{tour.title}</h3>
+                    <h3 className="font-semibold text-gray-800 mb-3 line-clamp-2">{tour.name?.replace(/\s*-\s*ADMIN UPDATED/gi, '') || tour.title || 'Tên tour không có'}</h3>
                     <div className="flex justify-between items-center text-sm text-gray-600 mb-3">
                       <span className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        {tour.duration}
+                        {tour.departureDates?.[0]?.number_of_days ? `${tour.departureDates?.[0]?.number_of_days} ngày ${tour.departureDates?.[0]?.number_of_nights} đêm` : tour.duration}
                       </span>
-                      <div className="text-lg font-bold text-gray-900">{tour.price.toLocaleString("vi-VN")}₫</div>
+                      <div className="text-lg font-bold text-gray-900">{tour.price != null ? tour.price.toLocaleString("vi-VN") : "--"}₫</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex">{renderStars(tour.rating)}</div>
@@ -701,7 +950,9 @@ export default function SearchPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-gray-500 text-center col-span-4 py-8">Không có tour phiêu lưu liên quan.</div>
+              )}
             </div>
           </div>
         </section>

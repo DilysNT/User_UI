@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './layout.css';
 import { Montserrat } from 'next/font/google';
 import { Toaster } from "../components/ui/toaster";
 import ImprovedErrorBoundary from "@/components/ImprovedErrorBoundary";

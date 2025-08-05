@@ -52,7 +52,17 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
     fetch(`http://localhost:5000/api/tours/${tourId}/complete`)
       .then(res => res.json())
       .then(data => {
-        console.log('Tour data from API:', data); // Debug log
+        // Chỉ hiển thị tour có trạng thái 'Đang hoạt động'
+        if (data.status !== 'Đang hoạt động') {
+          setTour(null);
+          setItineraries([]);
+          setIncludedServices([]);
+          setExcludedServices([]);
+          setHotels([]);
+          setTourCategories([]);
+          setDepartureDates([]);
+          return;
+        }
         // Đảm bảo có trường agency_name trong tour object
         let tourData = { ...data };
         if (!tourData.agency_name && tourData.agency && tourData.agency.name) {
@@ -226,7 +236,8 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                   src={galleryImages[currentImg] || "/placeholder.svg"}
                   alt={tour.name}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-all duration-500 ease-in-out scale-100 opacity-100"
+                  style={{transitionProperty: 'opacity, transform'}}
                 />
                 {/* Nút mũi tên trái */}
                 <button
@@ -249,8 +260,9 @@ export default function TourDetailPage({ tourId: propTourId }: TourDetailPagePro
                     key={i}
                     className={`relative h-16 rounded overflow-hidden cursor-pointer hover:opacity-80 border ${currentImg === i ? "border-teal-500" : "border-transparent"}`}
                     onClick={() => setCurrentImg(i)}
+                    onMouseEnter={() => setCurrentImg(i)}
                   >
-                    <Image src={img} alt={`Ảnh ${tour.name} ${i + 1}`} fill className="object-cover" />
+                    <Image src={img} alt={`Ảnh ${tour.name} ${i + 1}`} fill className="object-cover transition-transform duration-300 ease-in-out scale-100 hover:scale-105" />
                   </div>
                 ))}
               </div>

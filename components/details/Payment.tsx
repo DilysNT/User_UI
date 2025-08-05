@@ -23,9 +23,10 @@ export default function Payment({ params }: { params: { id: string } }) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<null | "success" | "error">(null)
   const [errorDialog, setErrorDialog] = useState<string | null>(null)
-
+console.log('ádsadatoken', localStorage.getItem('authToken') || localStorage.getItem('token'));
   useEffect(() => {
     // Kiểm tra paymentData từ localStorage (từ Booking.tsx)
+    
     const savedPaymentData = localStorage.getItem("paymentData");
     if (savedPaymentData) {
       try {
@@ -204,13 +205,19 @@ export default function Payment({ params }: { params: { id: string } }) {
       // Gửi booking lên backend, bổ sung payment_method và user_id đúng
       let bookingPayload = { ...pendingBooking, status: 'pending', payment_status: 'pending', payment_method: paymentMethod };
       // Ưu tiên user_id từ localStorage nếu user đang đăng nhập
-      let authUserId = null;
+      let authUserId: string | null = null;
+      let authToken: string | null = null;
       try {
-        const authToken = localStorage.getItem('authToken') || localStorage.getItem('token');
-        if (authToken) {
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        if (token && typeof token === 'string') {
+          authToken = token;
           // Giải mã JWT để lấy user id
-          const payload = JSON.parse(atob(authToken.split('.')[1]));
-          if (payload && payload.id) authUserId = payload.id;
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            console.log('Decoded JWT payload:', payload);
+            if (payload && payload.id) authUserId = payload.id;
+          }
         }
       } catch {}
       if (authUserId) {
@@ -220,9 +227,14 @@ export default function Payment({ params }: { params: { id: string } }) {
         const { user_id, ...rest } = bookingPayload;
         bookingPayload = { ...rest, user_type: 'GUEST_USER' };
       }
+      // Chuẩn bị headers, thêm Authorization nếu có token
+      const headers = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
       const bookingRes = await fetch('http://localhost:5000/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(bookingPayload)
       });
       if (!bookingRes.ok) {
@@ -341,7 +353,19 @@ export default function Payment({ params }: { params: { id: string } }) {
   const tour = paymentData.tour || {};
   const pendingBooking = paymentData.pendingBooking || {};
   const guests = pendingBooking.guests || [];
-  
+
+  // Lấy số ngày và số đêm từ departureDates hoặc tour
+  let number_of_days = tour.number_of_days;
+  let number_of_nights = tour.number_of_nights;
+  // Nếu không có, thử lấy từ departureDates
+  if ((!number_of_days || !number_of_nights) && tour.departureDates && Array.isArray(tour.departureDates)) {
+    const selectedDate = tour.departureDates.find((d: any) => d.id === tour.departure_date_id || d.id === pendingBooking.departure_date_id);
+    if (selectedDate) {
+      number_of_days = selectedDate.number_of_days || number_of_days;
+      number_of_nights = selectedDate.number_of_nights || number_of_nights;
+    }
+  }
+
   const departureDate = tour.departure_date_value
     ? new Date(tour.departure_date_value).toLocaleDateString("vi-VN")
     : "Chưa chọn";
@@ -350,6 +374,14 @@ export default function Payment({ params }: { params: { id: string } }) {
                        (tour.price ? (Number(tour.price) * (tour.adults || 1) + Number(tour.price) * 0.7 * (tour.children || 0)) : 0);
   const discountAmount = tour.discount_amount ? Number(tour.discount_amount) : 0;
   const totalAmount = tour.total_price ? Number(tour.total_price) : (originalPrice - discountAmount);
+  // Parse số ngày và số đêm từ tên tour nếu dữ liệu không có
+  if ((!number_of_days || !number_of_nights) && tour.name) {
+    const match = tour.name.match(/(\d+)N(\d+)Đ/i);
+    if (match) {
+      number_of_days = match[1];
+      number_of_nights = match[2];
+    }
+  }
   // Debug log để kiểm tra dữ liệu giá
   console.log('Payment component pricing debug:', {
     paymentData,
@@ -363,7 +395,9 @@ export default function Payment({ params }: { params: { id: string } }) {
     tourChildren: tour.children,
     calculatedOriginalPrice: originalPrice,
     calculatedTotalAmount: totalAmount,
-    calculatedDiscountAmount: discountAmount
+    calculatedDiscountAmount: discountAmount,
+    number_of_days,
+    number_of_nights
   });
   return (
     <>
@@ -410,16 +444,6 @@ export default function Payment({ params }: { params: { id: string } }) {
                       <div className="text-sm text-gray-500">Thanh toán an toàn qua cổng VNPay</div>
                     </div>
                   </div>
-                  {/* ZaloPay */}
-                  <div className={`flex items-center border rounded-lg px-4 py-3 cursor-pointer transition ${paymentMethod === 'zalopay' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white'}`}
-                    onClick={() => setPaymentMethod('zalopay')}>
-                    <RadioGroupItem value="zalopay" id="zalopay" className="mr-4" />
-                    <img src="/zalopay.png" alt="ZaloPay" className="w-10 h-10 mr-4" />
-                    <div>
-                      <div className="font-semibold">ZaloPay</div>
-                      <div className="text-sm text-gray-500">Thanh toán qua ví điện tử ZaloPay</div>
-                    </div>
-                  </div>
                   {/* MoMo */}
                   <div className={`flex items-center border rounded-lg px-4 py-3 cursor-pointer transition ${paymentMethod === 'momo' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white'}`}
                     onClick={() => setPaymentMethod('momo')}>
@@ -430,16 +454,6 @@ export default function Payment({ params }: { params: { id: string } }) {
                       <div className="text-sm text-gray-500">Thanh toán qua ví điện tử Momo</div>
                     </div>
                   </div>
-                  {/* Bank Transfer */}
-                  <div className={`flex items-center border rounded-lg px-4 py-3 cursor-pointer transition ${paymentMethod === 'bank' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white'}`}
-                    onClick={() => setPaymentMethod('bank')}>
-                    <RadioGroupItem value="bank" id="bank" className="mr-4" />
-                    <img src="/bank.png" alt="Chuyển khoản ngân hàng" className="w-10 h-10 mr-4" />
-                    <div>
-                      <div className="font-semibold">Chuyển khoản ngân hàng</div>
-                      <div className="text-sm text-gray-500">Thanh toán qua tài khoản ngân hàng</div>
-                    </div>
-                  </div>
                 </RadioGroup>
               </div>
               <Accordion type="single" collapsible className="w-full">
@@ -447,10 +461,8 @@ export default function Payment({ params }: { params: { id: string } }) {
                   <AccordionTrigger>Chính sách thanh toán</AccordionTrigger>
                   <AccordionContent>
                     <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-                      <li>Thanh toán đầy đủ 100% giá trị tour khi đặt tour trước 7 ngày so với ngày khởi hành.</li>
-                      <li>Đối với booking đặt tour trong vòng 7 ngày so với ngày khởi hành, Quý khách vui lòng thanh toán 100% giá trị tour ngay khi đặt tour.</li>
-                      <li>Thanh toán bằng VNĐ thông qua chuyển khoản hoặc thanh toán trực tuyến.</li>
-                      <li>Sau khi thanh toán, hệ thống sẽ tự động gửi email xác nhận đặt tour thành công.</li>
+                      <li>Khách có thể thanh toán qua VNPay, MoMo hoặc các phương thức khác (nếu có).</li>
+                      <li>Sau khi thanh toán thành công, hệ thống gửi email xác nhận booking.</li>
                     </ul>
                   </AccordionContent>
                 </AccordionItem>
@@ -458,11 +470,9 @@ export default function Payment({ params }: { params: { id: string } }) {
                   <AccordionTrigger>Chính sách hủy tour</AccordionTrigger>
                   <AccordionContent>
                     <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-                      <li>Hủy tour trước 15 ngày so với ngày khởi hành: Hoàn 100% tiền tour.</li>
-                      <li>Hủy tour từ 8-14 ngày so với ngày khởi hành: Phí hủy 30% tiền tour.</li>
-                      <li>Hủy tour từ 5-7 ngày so với ngày khởi hành: Phí hủy 50% tiền tour.</li>
-                      <li>Hủy tour từ 3-4 ngày so với ngày khởi hành: Phí hủy 70% tiền tour.</li>
-                      <li>Hủy tour trong vòng 48h so với ngày khởi hành: Phí hủy 100% tiền tour.</li>
+                      <li>Khách đăng nhập (user) hoặc đại lý (agency) chỉ được hủy booking của mình.</li>
+                      <li>Khách vãng lai (guest) có thể hủy booking qua link và cancelToken.</li>
+                      <li>Không thể hủy nếu tour đã khởi hành hoặc booking đã bị hủy.</li>
                     </ul>
                   </AccordionContent>
                 </AccordionItem>
@@ -470,10 +480,14 @@ export default function Payment({ params }: { params: { id: string } }) {
                   <AccordionTrigger>Chính sách hoàn tiền</AccordionTrigger>
                   <AccordionContent>
                     <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-                      <li>Việc hoàn tiền sẽ được thực hiện trong vòng 7-15 ngày làm việc kể từ ngày Travel Tour xác nhận yêu cầu hủy tour của Quý khách.</li>
-                      <li>Tiền hoàn sẽ được chuyển vào tài khoản ngân hàng mà Quý khách đã thanh toán ban đầu.</li>
-                      <li>Trường hợp tour bị hủy bởi công ty du lịch: Hoàn 100% tiền tour.</li>
-                      <li>Trường hợp bất khả kháng (thiên tai, dịch bệnh, chiến tranh...): Công ty sẽ đề xuất phương án giải quyết phù hợp.</li>
+                      <li>Hủy trước 7 ngày so với ngày khởi hành: hoàn 100% (trừ phí không hoàn lại).</li>
+                      <li>Hủy trước 3-7 ngày: hoàn 50% (trừ phí không hoàn lại).</li>
+                      <li>Hủy trong vòng 3 ngày: không hoàn tiền.</li>
+                      <li>Nếu agency là người hủy: luôn hoàn 100%.</li>
+                      <li>Các loại phí không hoàn lại: visa, đặt cọc, phí thanh toán, vé máy bay (nếu có).</li>
+                      <li>Nếu đủ thông tin giao dịch, hệ thống sẽ hoàn tiền tự động qua VNPay/MoMo.</li>
+                      <li>Nếu không đủ thông tin hoặc lỗi, hoàn tiền thủ công (CSKH liên hệ khách).</li>
+                      <li>Khách sẽ nhận email thông báo trạng thái hoàn tiền (tự động hoặc thủ công).</li>
                     </ul>
                   </AccordionContent>
                 </AccordionItem>
@@ -565,7 +579,7 @@ export default function Payment({ params }: { params: { id: string } }) {
                       <Clock className="w-4 h-4 mr-2 text-gray-500" />
                       <span>Thời gian:</span>
                     </div>
-                    <span className="font-medium">{tour.number_of_days || "--"} ngày {tour.number_of_nights || "--"} đêm</span>
+                    <span className="font-medium">{number_of_days || "--"} ngày {number_of_nights || "--"} đêm</span>
                   </div>
                 </div>
                 <Separator className="my-4" />
@@ -591,7 +605,7 @@ export default function Payment({ params }: { params: { id: string } }) {
                 {/* Hiển thị giá trước và sau khi giảm */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Tạm tính:</span>
+                    <span className="text-sm text-gray-600">Giá gốc:</span>
                     <span className={`font-medium ${discountAmount > 0 ? 'line-through text-gray-500' : ''}`}>
                       {originalPrice.toLocaleString("vi-VN")}₫
                     </span>

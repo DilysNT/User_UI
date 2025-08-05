@@ -65,19 +65,27 @@ export default function Header({ textColor = "white" }: HeaderProps) {
             return null;
           }
           if (!res.ok) throw new Error('Fetch user failed');
-          return res.json();
+          return res.text(); // Đổi từ .json() sang .text() để kiểm tra dữ liệu
         })
         .then(data => {
-          if (data) {
-            // Nếu data.user không có, thử setUser(data)
-            const userObj = data.user || data;
-            console.log('Header: fetched user successfully');
-            setUser(userObj);
-            localStorage.setItem('user', JSON.stringify(userObj));
+          if (typeof data === 'string' && data !== 'undefined') {
+            try {
+              const json = JSON.parse(data);
+              const userObj = json.user || json;
+              console.log('Header: fetched user successfully');
+              setUser(userObj);
+              localStorage.setItem('user', JSON.stringify(userObj));
+            } catch (err) {
+              // Ẩn lỗi JSON parse
+              setUser(null);
+              localStorage.removeItem('user');
+              localStorage.removeItem('token');
+            }
           }
         })
         .catch((err) => {
-          console.error('Header: user fetch error:', err.message);
+          // Ẩn lỗi hoặc log nhẹ
+          // console.error('Header: user fetch error:', err.message);
           setUser(null);
           localStorage.removeItem('user');
           localStorage.removeItem('token');
@@ -120,14 +128,14 @@ export default function Header({ textColor = "white" }: HeaderProps) {
           position: "fixed"
         }}
       >
-        <div className="w-full px-8 py-5 flex items-center relative">
+        <div className="w-full px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 flex items-center relative">
           {/* Logo bên trái */}
           <div className="flex-1 flex items-center space-x-2 cursor-pointer" onClick={() => router.push("/")}> 
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${atTop ? "bg-white/80" : "bg-white"}`}>
-              <span className="text-blue-500 font-bold text-sm">✈︎</span>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${atTop ? "bg-white/80" : "bg-white"}`}> 
+              <span className="text-blue-500 font-bold text-xs sm:text-sm">✈︎</span>
             </div>
             <span
-              className="text-2xl font-bold tracking-widest"
+              className="text-lg sm:text-xl md:text-2xl font-bold tracking-widest"
               style={{ fontFamily: "'Nico Moji', Arial, sans-serif" }}
             >
               TRAVEL TOUR
@@ -135,7 +143,7 @@ export default function Header({ textColor = "white" }: HeaderProps) {
           </div>
 
           {/* Nav ở giữa */}
-          <nav className="hidden md:flex items-center space-x-8 justify-center">
+          <nav className="hidden md:flex items-center space-x-6 md:space-x-8 justify-center">
             <Link href="/" className={textColor === "black" ? "hover:text-cyan-700 transition-colors" : "hover:text-cyan-200 transition-colors"}>
               Trang chủ
             </Link>
@@ -147,15 +155,37 @@ export default function Header({ textColor = "white" }: HeaderProps) {
             </Link>
           </nav>
 
+          {/* Mobile nav icon */}
+          <div className="md:hidden flex items-center justify-center mr-2">
+            <button
+              className="p-2 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              aria-label="Mở menu"
+              onClick={() => setShowDropdown(!showDropdown)}
+            >
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white dark:text-black">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            {/* Dropdown menu cho mobile nav */}
+            {showDropdown && (
+              <div className="absolute right-0 top-14 bg-white shadow-lg rounded-lg p-4 min-w-[180px] animate-fade-in text-black z-50">
+                <Link href="/" className="block py-2 px-3 hover:bg-cyan-50 rounded" onClick={() => setShowDropdown(false)}>Trang chủ</Link>
+                <Link href="/destination" className="block py-2 px-3 hover:bg-cyan-50 rounded" onClick={() => setShowDropdown(false)}>Điểm đến</Link>
+                <Link href="/blog" className="block py-2 px-3 hover:bg-cyan-50 rounded" onClick={() => setShowDropdown(false)}>Blog</Link>
+              </div>
+            )}
+          </div>
+
           {/* User/Profile bên phải */}
           <div className="flex-1 flex justify-end items-center">
             {/* Nút đăng nhập hoặc thông tin user */}
             {user ? (
               <div className="flex items-center space-x-2 cursor-pointer relative" ref={dropdownRef}>
                 <div
-                  className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center text-black font-bold"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-yellow-400 flex items-center justify-center text-black font-bold"
                   onClick={() => { 
-                    console.log('Header: User icon clicked');
                     setShowProfile(true); 
                     setShowDropdown(false); 
                   }}
@@ -193,13 +223,12 @@ export default function Header({ textColor = "white" }: HeaderProps) {
                   </div>
                 )}
                 <ProfileModal open={showProfile} onClose={() => {
-                  console.log('Header: ProfileModal onClose called');
                   setShowProfile(false);
                 }} />
               </div>
             ) : (
               <Button
-                className={`font-semibold ${textColor === "black" ? "bg-yellow-400 hover:bg-yellow-500 text-black" : atTop ? "bg-yellow-400 hover:bg-yellow-500 text-black" : "bg-yellow-400 hover:bg-yellow-500 text-black"}`}
+                className={`font-semibold px-4 py-2 text-sm sm:text-base ${textColor === "black" ? "bg-yellow-400 hover:bg-yellow-500 text-black" : atTop ? "bg-yellow-400 hover:bg-yellow-500 text-black" : "bg-yellow-400 hover:bg-yellow-500 text-black"}`}
                 onClick={() => router.push("/auth")}
               >
                 Đăng nhập

@@ -341,7 +341,6 @@ export default function Booking({ params }: { params: { id: string } }) {
     // Auto-populate participant info from contact info when only 1 participant
     if (section === "contactInfo" && formData.participants.length === 1) {
       const updatedParticipants = [...newFormData.participants];
-      
       if (field === "fullName" && value.trim()) {
         updatedParticipants[0] = {
           ...updatedParticipants[0],
@@ -352,8 +351,15 @@ export default function Booking({ params }: { params: { id: string } }) {
           ...updatedParticipants[0],
           phone: value,
         };
+      } else if (field === "address" && value.trim()) {
+        // Đồng bộ số CCCD sang participant đầu tiên nếu chưa có
+        if (!updatedParticipants[0].idNumber) {
+          updatedParticipants[0] = {
+            ...updatedParticipants[0],
+            idNumber: value,
+          };
+        }
       }
-      
       newFormData.participants = updatedParticipants;
     }
     
@@ -496,10 +502,18 @@ export default function Booking({ params }: { params: { id: string } }) {
     setPromotionId(null);
     setOriginalPrice(null);
     setFinalPrice(null);
+    
     if (!codeToUse.trim()) {
       setPromoError("Vui lòng nhập mã giảm giá.");
       return;
     }
+    
+    // Kiểm tra đăng nhập trước khi apply mã giảm giá
+    if (!isUserLoggedIn) {
+      setPromoError("Bạn cần đăng nhập để sử dụng mã giảm giá!");
+      return;
+    }
+    
     try {
       // Tính giá gốc theo logic mới: người lớn full price, trẻ em 50% price
       const adultPrice = tourData.price * tourData.adults;
@@ -705,27 +719,40 @@ export default function Booking({ params }: { params: { id: string } }) {
       });
 
       // 4. Lấy user_id từ JWT token (ưu tiên lấy từ token, fallback guest)
-      let bookingUserId = '3ca8bb89-a406-4deb-96a7-dab4d9be3cc1';
+      // Luôn ưu tiên lấy user_id từ userInfo nếu đã đăng nhập thành công
+      // Nếu không có userInfo thì mới fallback sang JWT hoặc guest
+      let bookingUserId = '3ca8bb89-a406-4deb-96a7-dab4d9be3cc1'; // default guest id, chỉ dùng khi không login
       let bookingUserType = 'GUEST_USER';
-      let debugToken: string | null = null;
-      if (typeof window !== 'undefined') {
-        debugToken = localStorage.getItem('authToken') || localStorage.getItem('token');
-      }
-      if (debugToken) {
-        try {
-          const payload = JSON.parse(atob(debugToken.split('.')[1]));
-          if (payload && payload.id) {
-            bookingUserId = payload.id;
-            bookingUserType = 'AUTHENTICATED_USER';
-            console.log('✅ Using user_id from JWT:', bookingUserId);
-          } else {
-            console.warn('⚠️ JWT payload has no id, using guest id');
-          }
-        } catch (err) {
-          console.warn('JWT decode failed, fallback to guest id', err);
+      if (isUserLoggedIn && userInfo && userInfo.id) {
+        if (typeof userInfo.id === 'string' && userInfo.id.length > 10) {
+          bookingUserId = userInfo.id;
+          bookingUserType = 'AUTHENTICATED_USER';
+          console.log('✅ Using user_id from userInfo:', bookingUserId, userInfo);
+        } else {
+          console.warn('⚠️ userInfo.id không hợp lệ:', userInfo);
         }
       } else {
-        console.warn('⚠️ No JWT token found, using guest id');
+        // Fallback: lấy từ JWT token nếu có
+        let debugToken: string | null = null;
+        if (typeof window !== 'undefined') {
+          debugToken = localStorage.getItem('authToken') || localStorage.getItem('token');
+        }
+        if (debugToken) {
+          try {
+            const payload = JSON.parse(atob(debugToken.split('.')[1]));
+            if (payload && payload.id) {
+              bookingUserId = payload.id;
+              bookingUserType = 'AUTHENTICATED_USER';
+              console.log('✅ Using user_id from JWT:', bookingUserId);
+            } else {
+              console.warn('⚠️ JWT payload has no id, using guest id');
+            }
+          } catch (err) {
+            console.warn('JWT decode failed, fallback to guest id', err);
+          }
+        } else {
+          console.warn('⚠️ No JWT token found, using guest id');
+        }
       }
 
       // 5. Chuẩn bị PENDING booking data (chưa tạo booking record)
@@ -807,6 +834,18 @@ export default function Booking({ params }: { params: { id: string } }) {
       } else {
         alert('Có lỗi xảy ra! Vui lòng thử lại.');
       }
+    }
+  }
+
+  // Lấy số ngày và số đêm từ departureDates hoặc tourData
+  let number_of_days = tourData.number_of_days;
+  let number_of_nights = tourData.number_of_nights;
+  if ((!number_of_days || !number_of_nights) && Array.isArray(departureDates) && tourData.departure_date_id) {
+    const selectedDate = departureDates.find((d: any) => d.id === tourData.departure_date_id);
+    if (selectedDate) {
+      number_of_days = selectedDate.number_of_days || number_of_days;
+      // Nếu không có number_of_nights, tính bằng number_of_days - 1 nếu hợp lý
+      number_of_nights = selectedDate.number_of_nights || (selectedDate.number_of_days ? selectedDate.number_of_days - 1 : number_of_nights);
     }
   }
 
@@ -1303,7 +1342,22 @@ export default function Booking({ params }: { params: { id: string } }) {
                       </div>
                       <div className="flex items-center text-sm text-gray-600 mt-1">
                         <Clock className="w-4 h-4 mr-1" />
-                        <span>{tourData.duration || 'Không có'}</span>
+                        <span>{(() => {
+                          // Ưu tiên lấy từ dữ liệu
+                          if (number_of_days && typeof number_of_nights === 'number') {
+                            return `${number_of_days} ngày ${number_of_nights} đêm`;
+                          }
+                          // Nếu thiếu, parse từ tên tour
+                          const name = tourData.name || '';
+                          const match = name.match(/(\d+)N(\d+)Đ/i);
+                          if (match) {
+                            const days = match[1];
+                            const nights = match[2];
+                            return `${days} ngày ${nights} đêm`;
+                          }
+                          // Nếu vẫn không có, fallback như cũ
+                          return 'Không có';
+                        })()}</span>
                       </div>
                     </div>
                   </div>

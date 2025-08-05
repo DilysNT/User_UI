@@ -32,7 +32,11 @@ export default function LocationDetailPage() {
     setLoadingTours(true);
     try {
       const res = await fetch(`http://localhost:5000/api/tours/destination/${dest.id}`);
-      const data = await res.json();
+      let data = await res.json();
+      // Lọc chỉ các tour có status 'Đang hoạt động'
+      if (Array.isArray(data)) {
+        data = data.filter(tour => tour.status === 'Đang hoạt động');
+      }
       setDestinationTours(data); // Sửa ở đây: API trả về mảng
     } catch {
       setDestinationTours([]);
